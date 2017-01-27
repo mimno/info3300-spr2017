@@ -1,0 +1,102 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Pages</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
+="stylesheet">
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+</style>
+</head>
+<body>
+<h3>Notes for Friday, January 27</h3>
+<p>
+	HW1 is available on <a href="https://cms.csuglab.cornell.edu/">CMS</a>. If you can't access CMS, let me know.
+	Sign up for <a href="https://piazza.com/cornell/spring2017/infocs3300">Piazza</a>.
+</p>
+
+<p>We will be working in Javascript. What are some of the unusual aspects of this language?
+</p>
+
+<p>For more information on Javascript, you may want to consult Douglas Crockford's "Javascript: the Good Parts", as well as <a href="https://github.com/getify/You-Dont-Know-JS">You Don't Know JS</a> -- particularly the parts about <a href="https://github.com/getify/You-Dont-Know-JS/blob/master/scope%20%26%20closures/README.md">variable scope</a>.
+</p>
+
+<p>Review <a href="http://www.json.org">Javascript Object Notation</a>. JSON will be one of our primary methods of reading data files, but it is also a good way of learning about how to write literal values of arrays and objects.</p>
+
+<script>
+// We declare variables with var. Scope in JS can be a little odd.
+var x = 3.1;
+
+// We can use the typeof() function to find out about JS's type system -- the "rules of the road" for a language.
+typeof(x);
+
+// Unlike Java and Python, JS does not distinguish integers and floating-point numbers
+if (typeof(1) == typeof(1.0)) { console.log("same type"); }
+
+// Strings are an important type
+typeof("this is a string");
+
+// Strings have lots of useful features.
+if ("Ithaca".endsWith("a")) {
+	console.log("It does");
+}
+console.log("доброе утро".codePointAt(1))
+
+// Strings can be any Unicode character. Identifiers can be any unicode character, but must start with a letter.
+var bavarian = "grüß gott";
+var hello = "你好";
+var smiley =  "😀";
+var π = 3.14;
+var 你好 = "hello";
+// doesn't work: 
+// var 💩 = "poo";
+
+// You can convert a string to a number
+console.log(Number("3.1") == 3.1);
+
+// We can use JSON syntax to write array literals, and then operate on them as in other languages.
+var drinks = ["Tea", "Coffee", "Chocolate"];
+console.log(drinks[2]);
+
+// Arrays can mix types
+var weirdArray = [1, 2, "big"];
+
+// Objects are a type. They map properties to values. Property identifiers must be strings. We use JSON to write object literals. Note that JSON is more strict than JS, it requires quotation marks around property names. Remember that if you are reading or saving JSON to a file.
+var course = { name: "3300", size: 300, boring: false };
+
+// Weirdly, arrays are actually objects:
+console.log( typeof(course) === typeof(weirdArray) ? "same type" : "different type" );
+
+// More syntactic help. You can write regular expressions like this:
+var pattern = /[aeiou]/g;
+console.log("ithaca".replace(pattern, "V"));
+// But regexps are still just objects!
+
+// Most shocking: FUNCTIONS are a type. You can define a function literal the same way you can write a string or number literal.
+// These are the same:
+function identity (x) { return x; }
+var otherIdentity = function (x) {return x; };
+
+// This has two implications:
+//  1. We can use a function to return another function:
+
+function colorGenerator () {
+	return function () { return "blue"; };
+}
+
+//  2. We can pass functions as arguments to other functions:
+
+function showColor(colorFunction) {
+	console.log("My color is " + colorFunction());
+}
+// Think about what this call does:
+showColor(colorGenerator());
+
+// Other types include booleans and a special "undefined" type.
+typeof(true);
+typeof(slkjflskdjf);
+
+
+</script>
+
+</body>
+</html>

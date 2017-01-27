@@ -3,6 +3,8 @@
 <title>INFO 3300 - Data-driven Web Pages</title>
 <link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
 ="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
 <style>
 body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
 </style>
@@ -22,7 +24,10 @@ body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
 
 <p>Review <a href="http://www.json.org">Javascript Object Notation</a>. JSON will be one of our primary methods of reading data files, but it is also a good way of learning about how to write literal values of arrays and objects.</p>
 
-<script>
+<pre><code id="display">
+</code></pre>
+
+<script id="notes">
 // We declare variables with var. Scope in JS can be a little odd.
 var x = 3.1;
 
@@ -40,6 +45,7 @@ if ("Ithaca".endsWith("a")) {
 	console.log("It does");
 }
 console.log("доброе утро".codePointAt(1))
+console.log("good morning".codePointAt(1))
 
 // Strings can be any Unicode character. Identifiers can be any unicode character, but must start with a letter.
 var bavarian = "grüß gott";
@@ -47,7 +53,7 @@ var hello = "你好";
 var smiley =  "😀";
 var π = 3.14;
 var 你好 = "hello";
-// doesn't work: 
+// doesn't work (emojis aren't letters): 
 // var 💩 = "poo";
 
 // You can convert a string to a number
@@ -96,6 +102,10 @@ typeof(true);
 typeof(slkjflskdjf);
 
 
+</script>
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
 </script>
 
 </body>

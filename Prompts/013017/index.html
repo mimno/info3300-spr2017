@@ -1,0 +1,55 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Pages</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
+="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, January 30</h3>
+
+<p>Get a local web server running.</p>
+
+<p>Theory Reading 1: <a href="http://mimno.infosci.cornell.edu/info3300/readings/layered-grammar.pdf">A Layered Grammar of Graphics</a> by Hadley Wickham. Due Monday, Feb 6.</p>
+
+<p>What JS capabilities are available to us? <a href="http://caniuse.com/#feat=arrow-functions">Can I Use</a> and <a href="https://en.wikipedia.org/wiki/Usage_share_of_web_browsers">Browser Usage</a>.
+</p>
+
+<p>Inspiration: <a href="http://rhythm-of-food.net/">the Rhythm of Food</a>.</p>
+
+<!-- Here's a standard HTML div element with an ID and a class -->
+<div id="d1" class="header">Hello!</div>
+
+<!-- Here's an SVG canvas element. Note that in this file it looks like the <div> above. -->
+<svg height="200" width="200">
+  <!-- Visual elements are represented by tags, which have attributes -->
+  <circle cx="30" cy="30" r="10" id="c1" />
+</svg>
+
+<!-- Here are two types of form inputs. -->
+<input id="t1" type="text" value="Hello!"/>
+<input id="slider" type="range" min="0" max="100" value="30"/>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+<script id="notes">
+// Modify the text and attributes of the text tag.
+
+// Modify attributes and styles of an SVG shape.
+
+// Set an event listener that connects the slider tool with the SVG circle.
+</script>
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,40 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Pages</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
+="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, February 1</h3>
+
+	<div>Inspiration: Edward Tufte popularized <a href="https://en.wikipedia.org/wiki/File:Minard.png">this map by Charles Minard of Napoleon's disastrous Russian invasion</a> as the greatest visual presentation of data ever. How many different variables is Minard presenting? What is he choosing NOT to present? (Is this actually a map?) What elements would you use to copy this "carte figurative" in SVG?
+	</div>
+
+	<div>
+		SVG is an XML specification of vector graphics. Visual elements are represented as tags, which have styles and attributes. 
+	</div>
+	<div>
+		1. Polylines. How does SVG understand coordinates?
+		<svg height="400" width="400">
+		</svg>
+	</div>
+	<div>
+		2. Paths. This is the most complicated SVG element, but also one of the most useful. It contains <a href="https://www.w3.org/TR/SVG/paths.html#PathData">a tiny programming language</a>. In-class project: Make a plot like Minard's.
+		<svg height="400" width="400">
+		</svg>
+	</div>
+	<div>
+		3. Transformations are another useful (but a bit tricky) tool. How do we stretch, rotate, and shift elements, and how does the order of these operations affect the result?
+		<svg height="400" width="400">
+		</svg>
+	</div>
+	
+
+
+</body>
+</html>

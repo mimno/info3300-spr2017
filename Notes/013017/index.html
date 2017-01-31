@@ -1,0 +1,109 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Pages</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
+="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid black 1px; }
+</style>
+</head>
+<body>
+<h3>Notes for Monday, January 30</h3>
+
+<p>Get a local web server running. I use <tt>python -m http.server</tt> for python 3; use <tt>python -m SimpleHTTPServer 8000</tt> for python 2, which is the default on macs.</p>
+
+<p>Theory Reading 1: <a href="http://mimno.infosci.cornell.edu/info3300/readings/layered-grammar.pdf">A Layered Grammar of Graphics</a> by Hadley Wickham. Due Monday, Feb 6. Don't worry too much about the R code. Focus on how Wickham describes the parts of a plot. Be able to define and provide examples for: "geometry", "scale", and "guide".</p>
+
+<p>What JS capabilities are available to us? <a href="http://caniuse.com/#feat=arrow-functions">Can I Use</a> and <a href="https://en.wikipedia.org/wiki/Usage_share_of_web_browsers">Browser Usage</a>. Note that your TAs are using recent Chrome browsers, but much of the world is not.
+</p>
+
+<p>Inspiration: <a href="http://rhythm-of-food.net/">the Rhythm of Food</a>. Think of this as you read the Wickham article. What scales are they using? How are they teaching you to interpret those scales?</p>
+
+<!-- Here's a standard HTML div element with an ID and a class -->
+<div id="d1" class="header">Hello!</div>
+
+<!-- Here's an SVG canvas element. Note that in this file it looks like the <div> above. -->
+<svg height="500" width="500">
+  <!-- Visual elements are represented by tags, which have attributes -->
+  <circle cx="100" cy="100" r="20" id="c1" />
+</svg>
+
+<!-- Here are two types of form inputs. -->
+<input id="t1" type="text" value="Hello!"/>
+<input id="slider" type="range" min="0" max="100" value="30"/>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+<script id="notes">
+// For the homework:
+// Remember that functions are values, just like 3 or "red".
+
+function favoriteColor () {
+	return "blue";
+}
+function favoriteNumber () {
+	return 51;
+}
+
+// We can use a literal expression for a function and return it.
+// The function remembers the values of variables that were defined when it was created.
+function stringReturner(s) {
+	return function () { return s; }
+}
+// A function's name is just a variable. We can change the underlying value with =.
+favoriteColor = stringReturner("yellow");
+favoriteNumber = favoriteColor;
+
+// We can pass a function as an argument.
+function display (contentFunction) {
+	console.log(contentFunction());
+}
+
+display(favoriteNumber);
+
+// For accessing and modifying the visible elements on a page:
+
+// Modify the text and attributes of the text tag.
+var textDiv = document.getElementById("d1");
+// textDiv is now available from the JS console, but we can also alter it in script code.
+
+// We can change attributes of the element itself
+textDiv.innerText = "Goodbye!";
+
+// Or its CSS styles
+textDiv.style.fontFamily = "Helvetica";
+textDiv.style.fontSize = "30pt";
+
+// SVG elements are exactly like standard HTML elements.
+// Modify attributes and styles of an SVG shape.
+var circle = document.getElementById("c1");
+circle.setAttribute("r", 50);
+
+circle.style.fill = "#0000ff";
+circle.style.stroke = "green";
+circle.style.strokeWidth = 7;
+
+// Why do we care about setting the value of variables that point to functions?
+// We can use this pattern to specify behaviors. Each element has a large number of 
+//  event-listener variables, which usually point to a function that does nothing.
+
+// Set an event listener that connects the slider tool with the SVG circle.
+var slider = document.getElementById("slider");
+slider.oninput = function () {
+	circle.setAttribute("r", slider.value);
+};
+
+</script>
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+</body>
+</html>

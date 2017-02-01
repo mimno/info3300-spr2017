@@ -12,6 +12,17 @@ body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
 <body>
 <h3>Prompt for Wednesday, February 1</h3>
 
+	<div>
+	<ul>
+		<li>Advanced HTML/CSS Workshop: tomorrow, 6pm, Gates G01.</li>
+		<li>Need to miss class? Let us know in advance with the <a href="https://docs.google.com/forms/d/e/1FAIpQLSdogn-FQG2O0piCmxLPSB8K8RJ9VHJL3XlVl7uhq-M0D1z2Cw/viewform">attendance form</a>.</li>
+		<li>Office hours are now posted on Piazza. These may change, make sure to check for updates.</li>
+	</ul>
+	</div>
+	
+	<div>
+	</div>
+
 	<div>Inspiration: Edward Tufte popularized <a href="https://en.wikipedia.org/wiki/File:Minard.png">this map by Charles Minard of Napoleon's disastrous Russian invasion</a> as the greatest visual presentation of data ever. How many different variables is Minard presenting? What is he choosing NOT to present? (Is this actually a map?) What elements would you use to copy this "carte figurative" in SVG?
 	</div>
 
@@ -19,7 +30,7 @@ body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
 		SVG is an XML specification of vector graphics. Visual elements are represented as tags, which have styles and attributes. 
 	</div>
 	<div>
-		1. Polylines. How does SVG understand coordinates?
+		1. Rectangles. How does SVG understand coordinates?
 		<svg height="400" width="400">
 		</svg>
 	</div>
@@ -27,6 +38,10 @@ body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
 		2. Paths. This is the most complicated SVG element, but also one of the most useful. It contains <a href="https://www.w3.org/TR/SVG/paths.html#PathData">a tiny programming language</a>. In-class project: Make a plot like Minard's.
 		<svg height="400" width="400">
 		</svg>
+		<!-- The following numbers may be useful:
+			23 123  64 110 114 123 202 106 290 102 360 125 419 106 476  55 524  70 574  42 579  51 520  83 480 73 425 124 364 148 291 122 206 137 108 167  68 163  41 170
+			40 167  95 166 147 170 168 176 191 163 230 184 261 178 307 158 367 146 422 125 459 104 506  82 564  96 568  57 578  51 584  61 580  63 576 100 563 108 505  94 465 112 425 131 367 150 310 162 265 182  235 191 227 190 190 166 169 178 149 172  97 169  40 171
+		-->
 	</div>
 	<div>
 		3. Transformations are another useful (but a bit tricky) tool. How do we stretch, rotate, and shift elements, and how does the order of these operations affect the result?

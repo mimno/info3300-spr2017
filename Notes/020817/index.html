@@ -1,0 +1,144 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Notes for Wednesday, February 8</h3>
+
+<div>
+<ul>
+	<li>Advanced HTML/CSS Workshop: Thursday, 6pm, Gates 114.</li>
+	<li><a href="http://www.informationisbeautiful.net/visualizations/top-500-passwords-visualized/">Passwords you shouldn't use</a></li>
+</ul>
+</div>
+
+<div>
+	<p>On Monday we worked with a nice clean dataset. It was constructed (by me) for visualization, it had one object per drive with all the interesting variables, it was complete and accurate, and the values of the data variables (drive number, yards) were nicely spaced. Today's project shows what happens when none of that is true.</p>
+	
+	<p>We're working with <a href="http://data.worldbank.org/data-catalog/country-profiles">Country Profile data</a> from the world bank. Here are some of the issues we face:</p>
+	<ul>
+		<li>Ungrouped data. Each row in the spreadsheet represents one variable for one geographic area (countries <i>and</i> regions). We want to plot different variables against each other, so we need to group them and select variables we want. </li>
+		<li>Wordy variables. The data is intended to be used in spreadsheet form for people to use directly. We want to use it in a program. There are variable names like "Mortality rate, under-5 (per 1,000 live births)" that will not make good key-value pairs in an object.</li>
+		<li>Missing data. Missing values are shown with <tt>..</tt>. When we parse strings to numbers, these are silently converted to the special value <tt>NaN</tt>, for "not a number". Calling our scale functions on <tt>NaN</tt> doesn't cause an error either, it just returns  <tt>NaN</tt>. We only get errors when we try to set SVG attributes.</li>
+		<li>Incorrect data. Qatar jumps out as a massive outlier in GDP. That initially didn't strike me as odd because Qatar is often an outlier, but no -- that can't possibly be right. This data is saying that Qatar has vastly more economic activity than the entire world! Looking at the data, the value for 2015 is 164641483.52 billion dollars. The value for the Russian Federation is 1331.21. No way is this correct. According to the <a href="http://data.worldbank.org/country/qatar">World Bank website</a>, the GDP for Qatar is 164.61 billion dollars. The listed number is therefore off by a factor of one million.</li>
+		<li>Data dispersion. If we plot Population vs. GDP on a linear scale, there's a huge outlier (World). Everything else is stuffed in the bottom left corner. Our first and most powerful trick is to switch to a logarithmic scale.
+		</li>
+		<li>Data dispersion, part II. Even when we use a log scale, we still see a big diagonal slice of points with nothing on either side. We can make the points smaller and semi-transparent, but there is still a lot of <i>overplotting</i>.
+		</li>
+	</ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="400">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+svg.append("text")
+.attr("id", "CountryName")
+.attr("x", 0)
+.attr("y", 300)
+.style("font-size", "48pt");
+
+// Define variables outside the scope of the callback function.
+var countryData;
+var rawData, nestedData;
+
+// This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
+function parseLine (line) {
+	return { 
+		Country: line["Country Name"],
+		Variable: line["Series Name"],
+		value: Number(line["2015 [YR2015]"])
+	};
+}
+
+// Some data from http://data.worldbank.org/data-catalog/country-profiles
+
+d3.tsv("CountryProfile.tsv", parseLine, function (error, data) {
+	rawData = data;
+	
+	console.log("done loading");
+	
+	nestedData = d3.nest()
+	.key(function (d) { return d.Country; })
+	.entries(data);
+	
+	countryData = nestedData.map(function (country) {
+		var result = { Country: country.key };
+		
+		country.values.forEach(function (d) {
+			if (d.Variable == "Population, total") {
+				result.Population = d.value;
+			}
+			else if (d.Variable == "GDP (current US$)") {
+				result.GDP = d.value;
+			}
+			else if (d.Variable == "Surface area (sq. km)") {
+				result.Area = d.value;
+			}
+		});
+		
+		// Fix this here, rather than in the data file.
+		if (result.Country == "Qatar") {
+			result.GDP /= 1000000;
+		}
+		
+		return result;
+	});
+	
+	var popExtent = d3.extent(countryData,
+		function (d) { return d.Population; });
+	console.log(popExtent);
+	var popScale = d3.scaleLog()
+	.domain(popExtent)
+	.range([0, 400]);
+
+	var gdpExtent = d3.extent(countryData,
+		function (d) { return d.GDP; });
+	console.log(gdpExtent);
+	var gdpScale = d3.scaleLog()
+	.domain(gdpExtent)
+	.range([400, 0]);
+	
+	countryData = countryData.filter(function (d) { return d.Population && d.GDP; });
+	
+	countryData.forEach(function (country) {
+		svg.append("circle")
+		.attr("cx", popScale(country.Population))
+		.attr("cy", gdpScale(country.GDP))
+		.attr("r", 3)
+		.style("opacity", 0.3)
+		.on("mouseover", function () {
+			svg.select("#CountryName").text(country.Country);
+		});
+	});
+});
+
+console.log("after function");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

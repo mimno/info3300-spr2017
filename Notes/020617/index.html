@@ -1,0 +1,79 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel\
+="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, February 6</h3>
+
+<div>
+<ul>
+	<li>Advanced HTML/CSS Workshop: Thursday, 6pm, Gates 114.</li>
+	<li>Have a local web server running.</li>
+	<li>We are now using <a href="https://d3js.org/">Mike Bostock's d3 library</a>. Start reading <a href="https://github.com/d3/d3/blob/master/API.md">the documentation to learn secret skills</a>.</li>
+</ul>
+</div>
+
+<div>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="200">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var superbowl = [{"Team":"NE","Plays":3,"Yards":9,"Result":"punt"},{"Team":"ATL","Plays":4,"Yards":32,"Result":"punt"},{"Team":"NE","Plays":9,"Yards":41,"Result":"punt"},{"Team":"ATL","Plays":5,"Yards":24,"Result":"punt"},{"Team":"NE","Plays":5,"Yards":53,"Result":"fumble"},{"Team":"ATL","Plays":5,"Yards":71,"Result":"td"},{"Team":"NE","Plays":3,"Yards":8,"Result":"punt"},{"Team":"ATL","Plays":5,"Yards":62,"Result":"td"},{"Team":"NE","Plays":12,"Yards":52,"Result":"int"},{"Team":"NE","Plays":11,"Yards":52,"Result":"fg"},{"Team":"ATL","Plays":3,"Yards":4,"Result":"punt"},{"Team":"NE","Plays":3,"Yards":-2,"Result":"punt"},{"Team":"ATL","Plays":8,"Yards":85,"Result":"td"},{"Team":"NE","Plays":13,"Yards":75,"Result":"td"},{"Team":"ATL","Plays":3,"Yards":-15,"Result":"punt"},{"Team":"NE","Plays":12,"Yards":72,"Result":"fg"},{"Team":"ATL","Plays":3,"Yards":-2,"Result":"fumble"},{"Team":"NE","Plays":5,"Yards":25,"Result":"td"},{"Team":"ATL","Plays":6,"Yards":45,"Result":"punt"},{"Team":"NE","Plays":10,"Yards":91,"Result":"td"},{"Team":"ATL","Plays":4,"Yards":16,"Result":"punt"},{"Team":"NE","Plays":1,"Yards":13,"Result":"end"},{"Team":"NE","Plays":8,"Yards":75,"Result":"td"}];
+
+var svg = d3.select("svg");
+
+// These two scales map continuous values to pixel ranges.
+var yardsScale = d3.scaleLinear().domain([-100, 100]).range([0, 200]);
+var driveScale = d3.scaleLinear().domain([0, superbowl.length]).range([10, 390]);
+
+// For variables with discrete, symbolic values (averaging makes no sense, there's no inherent order), we use an ordinal scale to map elements from one array to elements of another array.
+var teamScale = d3.scaleOrdinal().domain(["NE", "ATL"]).range(["blue", "red"]);
+
+// Here's a custom scale. I'm checking against two valid values.
+var resultScale = function (d) {
+	if (d.Result == "td" || d.Result == "fg") { return 1.0; }
+	else { return 0.2; }
+}
+
+// We can use the index of a data element within a loop by adding a second argument. The arguments d, i are idiomatic here and well-known, and should NOT be construed as a general endorsement of single-character variable names.
+superbowl.forEach(function (d, i) {
+
+	svg.append("line")
+	.attr("x1", yardsScale(0)) // start the line from 0
+	.attr("y1", driveScale(i)) // height defined by index
+	.attr("x2", yardsScale(d.Yards)) // go left or right
+	.attr("y2", driveScale(i))
+	.style("stroke", teamScale(d.Team))
+	.style("stroke-width", 10)
+	.style("opacity", resultScale(d));
+
+});
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

@@ -1,0 +1,142 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, February 10</h3>
+
+<div>
+<ul>
+	<li><a href="http://www.loc.gov/pictures/resource/ppmsca.33873/?co=anedub">Another approach to massive scale differences by W.E.B. Du Bois</a></li>
+	<li><a href="http://bl.ocks.org/emeeks/3993c03914e81f1d57650292b3001b27">An attempt to recreate Du Bois' plot in d3</a></li>
+</ul>
+</div>
+
+<div>
+	<p>More on scales and guides.</p>
+	
+	<p>We're working with <a href="http://data.worldbank.org/data-catalog/country-profiles">Country Profile data</a> from the world bank. Here are some of the issues we face:</p>
+	<ul>
+		<li>Ungrouped data. </li>
+		<li>Wordy variables. </li>
+		<li>Missing data. </li>
+		<li>Incorrect data. </li>
+		<li>Data dispersion.</li>
+	</ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="400">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+
+svg.append("text")
+.attr("id", "CountryName")
+.attr("x", 30)
+.attr("y", 50)
+.style("font-size", "36pt");
+
+// Define variables outside the scope of the callback function.
+var countryData;
+var rawData, nestedData;
+
+// This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
+function parseLine (line) {
+	return { 
+		Country: line["Country Name"],
+		Variable: line["Series Name"],
+		value: Number(line["2015 [YR2015]"])
+	};
+}
+
+// Some data from http://data.worldbank.org/data-catalog/country-profiles
+
+d3.tsv("CountryProfile.tsv", parseLine, function (error, data) {
+	rawData = data;
+	
+	console.log("Code in the call-back function is only executed when the data file loads.");
+	
+	nestedData = d3.nest()
+	.key(function (d) { return d.Country; })
+	.entries(data);
+	
+	countryData = nestedData.map(function (country) {
+		var result = { Country: country.key };
+		
+		country.values.forEach(function (d) {
+			if (d.Variable == "Population, total") {
+				result.Population = d.value;
+			}
+			else if (d.Variable == "GDP (current US$)") {
+				result.GDP = d.value;
+			}
+			else if (d.Variable == "Surface area (sq. km)") {
+				result.Area = d.value;
+			}
+		});
+		
+		// Fix this here, rather than in the data file.
+		if (result.Country == "Qatar") {
+			//result.GDP /= 1000000;
+		}
+		
+		return result;
+	});
+	
+	var popExtent = d3.extent(countryData,
+		function (d) { return d.Population; });
+	console.log(popExtent);
+	var popScale = d3.scaleLog()
+	.domain(popExtent)
+	.range([0, 400]);
+	
+	var gdpExtent = d3.extent(countryData,
+		function (d) { return d.GDP; });
+	console.log(gdpExtent);
+	var gdpScale = d3.scaleLog()
+	.domain(gdpExtent)
+	.range([400, 0]);
+	
+	countryData = countryData.filter(function (d) { return d.Population && d.GDP; });
+	
+	countryData.forEach(function (country) {
+		svg.append("circle")
+		.attr("cx", popScale(country.Population))
+		.attr("cy", gdpScale(country.GDP))
+		.attr("r", 3)
+		.style("opacity", 0.3)
+		.on("mouseover", function () {
+			svg.select("#CountryName").text(country.Country);
+		});
+	});
+});
+
+console.log("Code after the d3.tsv() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

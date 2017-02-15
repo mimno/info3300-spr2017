@@ -1,0 +1,131 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+path.lineGraph { fill: none; stroke-width: 2; }
+</style>
+</head>
+<body>
+<h3>Notes for Monday, February 13</h3>
+
+<div>
+<ul>
+	<li><a href="https://www.washingtonpost.com/graphics/health/candy-dish/">Candy consumption at WaPo graphics [paywall]</a></li>
+</ul>
+</div>
+
+<div>
+	<p>Lines, areas; the <a href="https://bl.ocks.org/mbostock/3808218">data join</a></p>
+	
+	<p>We're working with <a href="https://www.bls.gov/data/">Bureau of Labor Statistics data</a>. We're considering:</p>
+	<ul>
+		<li>Asynchronous data loading. </li>
+		<li>Data nesting and summarization. </li>
+		<li>Generation of path strings. </li>
+		<li>Seasonal adjustment.</li>
+		<li>Data dispersion.</li>
+	</ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="400">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+svg.append("text")
+.attr("id", "SectorName")
+.attr("x", 10)
+.attr("y", 28)
+.style("font-size", "18pt");
+
+var dateScale = d3.scaleTime().domain([new Date("1990-01-01"), new Date("2016-12-01")]).range([0, 350]);
+var dateAxis = d3.axisBottom(dateScale);
+var employmentScale = d3.scaleLinear().domain([0,2300]).range([350, 0]);
+var employmentAxis = d3.axisLeft(employmentScale);
+
+var sectorScale = d3.scaleOrdinal(d3.schemeCategory20);
+
+var plot = svg.append("g").attr("transform", "translate(40,30)");
+plot.append("g").call(dateAxis).attr("transform", "translate(0,350)");
+plot.append("g").call(employmentAxis).attr("transform", "translate(0,0)");
+
+var pathGenerator = d3.line()
+.x(function (d) { return dateScale(d.Date); })
+.y(function (d) { return employmentScale(d.Employment); });
+
+// Define variables outside the scope of the callback function.
+var rawData, nestedData;
+var seasonalData, unadjustedData;
+
+// This function will be applied to all rows. Select three columns, change names, and convert strings to numbers.
+function parseLine (line) {
+	line.Date = new Date(line.Date);
+	line.Employment = Number(line.Employment);
+	
+	return line;
+}
+
+// Some data from http://data.worldbank.org/data-catalog/country-profiles
+
+d3.tsv("NYSEmployment.tsv", parseLine, function (error, data) {
+	rawData = data;
+	
+	console.log("Code in the call-back function is only executed when the data file loads.");
+
+	nestedData = d3.nest()
+	.key(function (d) { return d.Adjusted; })
+	.key(function (d) { return d.SectorName; })
+	.entries(data);
+	
+	seasonalData = nestedData[0].values;
+	unadjustedData = nestedData[1].values;
+	
+	showTrends(seasonalData);
+});
+
+function showTrends(data) {
+	// Create or modify paths for each sector
+	var paths = plot.selectAll("path.lineGraph").data(data);
+	
+	paths.enter().append("path")
+	.merge(paths)
+	.on("mouseover", function (d) { 
+		svg.select("#SectorName").text(d.key);
+	})
+	.attr("class", "lineGraph")
+	.transition().duration(1000)
+	.attr("d", function(sector) {
+		return pathGenerator(sector.values);
+	})	
+	.style("stroke", function(sector, i) {
+		return sectorScale(i);
+	});
+}
+
+
+console.log("Code after the d3.tsv() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

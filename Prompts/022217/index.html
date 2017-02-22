@@ -1,0 +1,110 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+path.country { fill: #ccc; stroke: #888;; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, February 22</h3>
+
+<div>
+	<p>Choropleth maps</p>
+<ul>
+	<li>Maps of <a href="https://googletrends.github.io/google_oscars/">Oscar nominated movie trailer popularity</a></li>
+	<li>How analysis based on <a href="https://theconversation.com/how-zip-codes-nearly-masked-the-lead-problem-in-flint-65626">ZIP codes in Flint MI</a> masked clear patterns in <a href="https://www.washingtonpost.com/graphics/health/flint-water-crisis/">lead contamination</a>.</li>
+	<li>Compare California counties to this <a href="https://bl.ocks.org/mbostock/5562380">Density plot</a> of California</li>
+	<li>Two resources for color scales: <a href="http://colorbrewer2.org/">Color Brewer</a> and <a href="http://vrl.cs.brown.edu/color">Colorgorical</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Multiple asynchronous data loading. </li>
+		<li>Geographic formats. </li>
+		<li>Generation of path strings. </li>
+		<li>Joining data across formats.</li>
+	</ul>
+</div>
+
+<div>Data from <a href="http://www.ers.usda.gov/data-products/atlas-of-rural-and-small-town-america.aspx">USDA Atlas of Rural and Small-Town America</a>.</div>
+
+<svg height="600" width="900"></svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+
+var projection = d3.geoAlbersUsa().scale(75);
+var pathGenerator = d3.geoPath().projection(projection);
+
+var divergingColors = ["#d8b365", "#f5f5f5", "#5ab4ac"];
+var sequentialColors = ['#e5f5f9','#99d8c9','#2ca25f'];
+
+var populationScale = d3.scaleLinear().domain([-5, 0, 5]).range(divergingColors);
+var percentScale = d3.scaleLinear().domain([0, 50, 100]).range(sequentialColors);
+
+var counties, states;
+var usdaAtlas;
+
+// function to handle any row-by-row processing on CSV
+var parseRow = function(row) {
+	return row;
+}
+
+d3.json("us.json", function (error, rawMap, rawAtlas) {
+	
+	console.log("Code in the call-back function is only executed when every data file loads.");
+	
+	counties = topojson.feature(rawMap, rawMap.objects.counties);
+	states = topojson.feature(rawMap, rawMap.objects.states);
+	
+	showMap(percentScale, "Ed5CollegePlusPct");
+});
+
+function showMap(scale, variable) {
+	// Create or modify paths for each country
+	
+	projection.fitExtent([[0,0], [svg.attr("width"), svg.attr("height")]], counties);
+	pathGenerator = d3.geoPath().projection(projection);
+	
+	var paths = svg.selectAll("path.country").data(counties.features);
+	paths.enter().append("path").attr("class", "country")
+	.on("click", function (d) { console.log(d.id); })
+	.merge(paths)
+	.transition().duration(1000)
+	.style("fill", function (county) {
+		// Fill this in
+	})
+	.attr("d", function (county) {
+		return pathGenerator(county);
+	});
+	
+}
+
+
+
+console.log("Code after the d3.json() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

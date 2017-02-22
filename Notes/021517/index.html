@@ -1,0 +1,110 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+path.country { fill: #ccc; stroke: #888;; }
+</style>
+</head>
+<body>
+<h3>Notes for Wednesday, February 15</h3>
+
+<div>
+<ul>
+	<li><a href="https://www.udel.edu/johnmack/frec682/cholera/snow_map.png">John Snow's map of cholera from a contaminated well</a>.</li>
+		<li>Lead test results that <a href="https://www.washingtonpost.com/graphics/health/flint-water-crisis/">closely match the borders of Flint, MI</a></li>
+</ul>
+</div>
+
+<div>
+	<p>Maps</p>
+	<ul>
+		<li>Asynchronous data loading. </li>
+		<li>Geographic formats. </li>
+		<li>Generation of path strings. </li>
+	</ul>
+</div>
+
+<!-- Here's an SVG element. Note that in this file it looks like the <div> above. -->
+<svg height="400" width="600">
+  <!-- Visual elements are represented by tags, which have attributes -->
+</svg>
+
+<script id="notes">
+
+var svg = d3.select("svg");
+
+var projection = d3.geoMercator().scale(75);
+var pathGenerator = d3.geoPath().projection(projection);
+
+var rawData;
+var countries;
+
+d3.json("world-50m.json", function (error, data) {
+	rawData = data;
+	
+	console.log("Code in the call-back function is only executed when the data file loads.");
+	
+	countries = topojson.feature(rawData, rawData.objects.countries);
+	showMap();
+});
+
+// Points for Ithaca and the mysterious NULL ISLAND.
+//  Note that it's longitude and latitude, not the other way around.
+var interestingPoints = [[-76.5, 42], [0,0]];
+
+// Whoa, Mercator looks pretty messed up if you rotate it...
+svg.on("click", function () { projection.rotate(projection.invert(d3.mouse(this))); showMap(); })
+
+function showMap() {
+	// Create or modify paths for each country
+	
+	projection.fitExtent([[0,0], [svg.attr("width"), svg.attr("height")]], countries);
+	pathGenerator = d3.geoPath().projection(projection);
+	
+	var paths = svg.selectAll("path.country").data(countries.features);
+	paths.enter().append("path").attr("class", "country")
+	.merge(paths) 
+	.transition().duration(1000)
+	.attr("d", function (country) {
+		return pathGenerator(country);
+	});
+	
+	var circles = svg.selectAll("circle").data(interestingPoints);
+	
+	// If we have reduced the number of points, remove circles
+	circles.exit().remove();
+	
+	// If we have increased the number of points, add circles, then 
+	//  merge them with the original selection so we can modify 
+	//  the appearance of everything all at once.
+	circles.enter().append("circle").attr("r", 3)
+	.merge(circles)
+	.attr("cx", function(d) { return projection(d)[0]; })
+	.attr("cy", function(d) { return projection(d)[1]; });
+}
+
+
+console.log("Code after the d3.json() call is executed immediately.");
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

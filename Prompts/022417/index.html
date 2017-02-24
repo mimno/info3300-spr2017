@@ -1,0 +1,99 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+path.country { fill: #ccc; stroke: #888;; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, February 24</h3>
+
+<div>
+	<p>Visual Perception</p>
+<ul>
+	<li>Looking for data? Andy Kirk has a <a href="http://www.visualisingdata.com/2017/02/archiving-collection-places-access-data/">comprehensive list of sources</a>.</li>
+	<li>Do pie charts really deserve <a href="https://twitter.com/maartenzam/status/835036238876930050">all</a> <a href="https://flowingdata.com/2008/09/19/pie-i-have-eaten-and-pie-i-have-not-eaten/">that</a> <a href="https://flowingdata.com/2014/12/01/pie-chart-pyramid/">shade</a>? <a href="https://eagereyes.org/papers/a-pair-of-pie-chart-papers">Maybe not</a>.</li>
+	<li>Let's find out for ourselves! Here we'll replicate studies by Cleveland and McGill (Science, 1985) and Heer and Bostock (CHI, 2010). <a href="https://goo.gl/forms/S5Tu0e920TqiXVtg2">Take this survey</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Can we reverse-engineer human perception? </li>
+		<li>Data: melting and grouping. </li>
+	</ul>
+</div>
+
+<div id="plots"></div>
+
+<script id="notes">
+
+var responses = [];
+var actualValues = {};
+
+var height = 200;
+var width = 350;
+
+var xScale = d3.scaleLinear().domain([0,100]).range([0,300]);
+var yScale = d3.scaleLinear().domain([0,100]).range([0,200]);
+
+// function to handle any row-by-row processing on TSV.
+//  "melt" the wide table into a tall narrow table.
+var parseForm = function(row) {
+	var timestamp = new Date(row["Timestamp"]);
+	Object.keys(row).forEach(function (key) {
+		if (key === "Timestamp") { return; }
+		responses.push({ Timestamp: timestamp, TypeQuestion: key, Value: Number(row[key]) });
+	});
+};
+
+var parseActual = function(row){
+	actualValues[row.Type + " " + row.Question] = Number(row.Value);
+};
+
+var binGenerator = d3.histogram();
+
+function showPlots(error, form, actual) {
+	questionData = d3.nest().key(function (d) { return d.TypeQuestion; })
+	.entries(responses);
+	
+	questionData.forEach(function (question) {
+		var values = question.values.map(function (d) { return d.Value; });
+		var bins = binGenerator(values);
+		console.log(bins);
+		
+		var svg = d3.select("#plots").append("svg")
+		.attr("height", height)
+		.attr("width", width);
+		
+	});
+	
+}
+
+d3.queue()
+.defer(d3.tsv, "Visual Decoding (Responses) - Form Responses 1.tsv", parseForm)
+.defer(d3.tsv, "actual.tsv", parseActual)
+.await(showPlots);
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

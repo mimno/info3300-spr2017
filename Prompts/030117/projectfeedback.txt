@@ -1,0 +1,70 @@
+
+[Hearst's Questions]
+This visualization makes important information visually salient.
+This visualization uses visual components appropriately.
+This visualization successfully presents multiple relevant facts in a single visual pattern.
+
+[Functionality]
+Correct use of relative URL paths.
+All elements work correctly without manipulation.
+The page loads in a reasonable amount of time.
+
+[Perception]
+I know which elements/properties have meaning and which do not.
+I immediately know how to interpret visual elements.
+I can accurately decode numeric values for variables.
+I can compare values of the same variable for different data points.
+Scales are selected appropriately for data types.
+
+[Special data points]
+Outliers are marked or handled appropriately.
+I can identify interesting examples (outliers, typical cases).
+
+[Focus and Depth]
+The project says something, it has a clear argument.
+I am able to test/confirm the assertions of the project's argument.
+I can formulate and test my own argument.
+
+[Data]
+I understand the cultural context of the data.
+Data was collected ethically.
+Data is of manageable complexity: neither trivial nor overwhelming.
+
+[Lasting effect]
+I learned something.
+The work is original, unexpected, or surprising.
+I want to know more about how the creators made the project.
+
+[Specific scales]
+
+Position scales:
+
+The meaning of x and y positions is clear.
+Transformations (log, sqrt) are used appropriately and clearly marked.
+Datapoints are distinguishable; overplotting is addressed effectively.
+
+Size scales:
+
+The relationship between area and the underlying data value is clear.
+Area scales are based at zero.
+Area changes proportional to data values.
+
+Color scales:
+
+Categorical color values are easy to distinguish (no more than seven).
+Continuous color values enable meaningful comparisons.
+Ordinal color values reflect meaningful divisions between levels of a variable.
+
+Bar and Pie charts:
+
+Each segment is clearly distinguishable.
+I can make accurate comparisons based on relative positions.
+
+Networks:
+
+I can follow individual paths. Links are not overwhelming.
+
+Maps:
+
+The projection is accurate and informative.
+Density of information is balanced with land area: Panama/Qatar vs. Russia/Brazil.

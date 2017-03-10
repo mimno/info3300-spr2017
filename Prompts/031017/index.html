@@ -1,0 +1,214 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+rect.bar { fill: #4169e1; }
+text.label {
+	fill: #888;
+	font-size: x-small;
+	dominant-baseline: middle; 
+	text-anchor: middle;
+}
+
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, March 10</h3>
+
+<div>
+<ul>
+	<li>For the rest of the semester we're going to concentrate not just on presenting data but presenting processes and algorithms. Here's an example from <a href="http://algorithms-tour.stitchfix.com/">StitchFix</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>What is a model, and why is it useful?</li>
+		<li>What is a linear model? What makes a linear model good?</li>
+		<li>How do we translate user actions into model actions?</li>
+	</ul>
+</div>
+
+<div id="buttons">
+	<button id="squaredLoss">Squared Loss</button>
+	<button id="absoluteLoss">Absolute Loss</button>
+	<button id="maxLoss">Max Loss</button>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 0;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding);
+
+var xScale = d3.scaleLinear().domain([-3, 3]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-3, 3]).range([height, 0]);
+
+var normalGenerator = d3.randomNormal();
+
+var model = { intercept: 0, slope: 0 };
+
+var points = [{"x":-1.2330973279191326,"y":-0.6994248342294702},{"x":1.7996387667207998,"y":1.1725462227268648},{"x":-1.3395548786759093,"y":-0.6176675455342835},{"x":-0.5800165358802124,"y":-0.7645341704142388},{"x":-2.3384514729522388,"y":-0.9678576437556518},{"x":-0.09651836507608529,"y":0.2987814878084641},{"x":-0.43080032781660527,"y":-0.45276217737047897},{"x":-2.198133135472373,"y":-1.002058273530259},{"x":-1.1146222404003339,"y":-0.536029602728414},{"x":-1.0686123793105093,"y":-0.5487531128780339}];
+
+//points.push({x: 2, y: -2});
+
+
+var circles = svg.selectAll("circle").data(points).enter()
+.append("circle")
+.attr("cx", function (d) { return xScale(d.x); })
+.attr("cy", function (d) { return yScale(d.y); })
+.attr("r", 5)
+.style("opacity", 0.7);
+
+var regressionLine = svg.append("line")
+.attr("class", "estimated")
+.attr("x1", xScale(-3))
+.attr("y1", yScale(model.slope * -3 + model.intercept))
+.attr("x2", xScale(3))
+.attr("y2", yScale(model.slope * 3 + model.intercept))
+.style("stroke", "#e41a1c");
+
+function calculateErrors(points, model) {
+	points.forEach(function (point) {
+		var prediction = model.slope * point.x +
+			model.intercept;
+		point.error = point.y - prediction;
+	});
+}
+
+function worstError(points) {
+	var i = d3.scan(points, function (a, b) {
+		return Math.abs(b.error) - Math.abs(a.error);
+	});
+	return [points[i]];
+}
+
+// calculate the difference between predicted y and actual y
+calculateErrors(points, model);
+
+var residuals = svg.selectAll("path.residual").data(points).enter()
+.append("path")
+.attr("class", "residual")
+.style("stroke", "none")
+.attr("d", errorLine);
+
+var maxResidual = svg.selectAll("path.maxresidual").data(worstError(points)).enter()
+.append("path")
+.attr("class", "maxresidual")
+.style("stroke", "none")
+.attr("d", errorLine);
+
+var squaredResiduals = svg.selectAll("path.square").data(points).enter()
+.append("path")
+.attr("class", "square")
+.style("opacity", 0.2)
+.style("fill", "none")
+.attr("d", errorSquare);
+
+function squaredError() {
+	return d3.sum(points, function (point) {
+		return point.error * point.error;
+	});
+}
+
+function absoluteError () {
+	return d3.sum(points, function (point) {
+		return Math.abs(point.error);
+	});
+}
+
+function maxError () {
+	return d3.max(points, function (point) {
+		return Math.abs(point.error);
+	});
+}
+
+var lossFunction = absoluteError;
+residuals.style("stroke", "none");
+maxResidual.style("stroke", "none");
+squaredResiduals.style("fill", "none");
+
+var rounder = d3.format(".5g");
+
+var modelText = svg.append("text")
+.attr("id", "status")
+.attr("x", 10).attr("y", 30)
+.text("Slope: " + rounder(model.slope) + " Loss: " +
+rounder(lossFunction()));
+
+d3.select("#squaredLoss").on("click", function () { console.log("what should this do?")});
+
+svg.on("click", function() {
+	var mouseXY = d3.mouse(this);
+	
+	console.log(mouseXY);
+	// Figure out where the mouse is in data coordinates
+	var clickX = 0; // Replace these with useful values in data coordinates.
+	var clickY = 0; //  ...
+	
+	// Calculate a new slope
+	model.slope = clickY / clickX;
+	
+	// update the errors
+	calculateErrors(points, model);
+	
+	modelText
+	.text("Slope: " + rounder(model.slope) + " Loss: " +
+	rounder(lossFunction()));
+	
+	// Move the regression line
+	regressionLine
+	.attr("y1", yScale(model.slope * -3 + model.intercept))
+	.attr("y2", yScale(model.slope * 3 + model.intercept));
+		
+	// Change the squares for each point
+	residuals.attr("d", errorLine)
+	squaredResiduals.attr("d", errorSquare);
+	maxResidual.data(worstError(points)).attr("d", errorLine);
+	
+});
+	
+
+
+function errorLine(point) {
+	// Return the path "d" string for a line from the
+	//  point to its predicted value
+	return "M" + xScale(point.x) + "," + yScale(point.y) + 
+	" L" + xScale(point.x) + "," + yScale(point.y - point.error);
+}
+
+function errorSquare(point) {
+	// Return the path "d" string for a square
+	return "M" + xScale(point.x) + "," + yScale(point.y) + 
+		" L" + xScale(point.error + point.x) + "," + yScale(point.y) +
+		" L" + xScale(point.error + point.x) + "," + yScale(point.y - point.error) +
+		" L" + xScale(point.x) + "," + yScale(point.y - point.error) +
+		"Z";
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

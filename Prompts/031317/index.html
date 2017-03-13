@@ -1,0 +1,167 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+.axis { opacity: 0.1; }
+path.residual { stroke: blue; opacity: 0.3; stroke-width: 2; }
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, March 13</h3>
+
+<div>
+<ul>
+	<li>Why <a href="https://fivethirtyeight.com/features/science-isnt-broken/#part1">linear regression?</a></li>
+	<li><a href="http://en.wikipedia.org/wiki/Simple_linear_regression">Simple Linear Regression</a> and <a href="http://en.wikipedia.org/wiki/Least_squares">Least Squares</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>How do we generate from a linear model?</li>
+		<li>What does the least-squares algorithm do?</li>
+		<li>What effect do model parameters have on the quality of our estimates?</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var xExtent = [-3, 3];
+var yExtent = [-3, 3];
+
+var xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+var yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(0) + ")").attr("class", "axis");
+svg.append("text").attr("x", width * 0.4).attr("y", height + 35).text("Input Variable");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis).attr("class", "axis").attr("transform", "translate("+ xScale(0) + ",0)");
+svg.append("text").attr("transform", "rotate(270) translate(-200, -24)").text("Prediction");
+
+var normalGenerator = d3.randomNormal();
+
+function generateFrom(intercept, slope, noise, n) {
+	var points = [];
+	
+	for (var i = 0; i < n; i++) {
+		var x = normalGenerator();
+		// Fill in the noisy y value
+		var y = 0; 
+		points.push({ x: x, y: y });
+	}
+	
+	return points;
+}
+
+// Calculate the optimal slope and intercept.
+function leastSquares(points) {
+	var model = { intercept: 0, slope: 0 };
+
+	if (points.length == 0) { return model; }
+
+	var meanX = d3.mean(points, function (d) { 
+		return d.x;
+	});
+
+	var meanY = d3.mean(points, function (d) { 
+		return d.y;
+	});
+
+	// Fill in the slope calculation
+	model.slope = 0;
+
+	model.intercept = meanY - model.slope * meanX;
+	return model;
+}
+
+var points = [];
+var model = leastSquares(points);
+
+var circles = svg.selectAll("circle").data(points).enter()
+.append("circle")
+.attr("cx", function (d) { return xScale(d.x); })
+.attr("cy", function (d) { return yScale(d.y); })
+.attr("r", 5)
+.style("opacity", 0.5);
+
+var regressionLine = svg.append("line")
+.attr("class", "estimated")
+.attr("x1", xScale(xExtent[0]))
+.attr("y1", yScale(model.slope * xExtent[0] + model.intercept))
+.attr("x2", xScale(xExtent[1]))
+.attr("y2", yScale(model.slope * xExtent[1] + model.intercept))
+.style("stroke", "#e41a1c");
+
+function squaredError() {
+	return d3.sum(points, function (point) {
+		return point.error * point.error;
+	});
+}
+
+var lossFunction = squaredError;
+
+function calculateErrors(points, model) {
+	points.forEach(function (point) {
+		var prediction = model.slope * point.x +
+			model.intercept;
+		point.error = point.y - prediction;
+	});
+}
+
+// calculate the difference between predicted y and actual y
+calculateErrors(points, model);
+
+var residuals = svg.selectAll("path.residual").data(points).enter()
+.append("path")
+.attr("class", "residual")
+.attr("d", errorLine);
+
+var rounder = d3.format(".5g");
+
+var modelText = svg.append("text")
+.attr("id", "status")
+.attr("x", 10).attr("y", 30)
+.text("y=" + rounder(model.slope) + "*x + " + rounder(model.intercept) + " Loss: " +
+rounder(lossFunction()));
+
+function errorLine(point) {
+	// Return the path "d" string for a line from the
+	//  point to its predicted value
+	return "M" + xScale(point.x) + "," + yScale(point.y) + 
+	" L" + xScale(point.x) + "," + yScale(point.y - point.error);
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

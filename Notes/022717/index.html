@@ -1,0 +1,143 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+rect.bar { fill: #4169e1; }
+text.label {
+	fill: #888;
+	font-size: x-small;
+	dominant-baseline: middle; 
+	text-anchor: middle;
+}
+
+</style>
+</head>
+<body>
+<h3>Notes for Monday, February 27</h3>
+
+<div>
+	<p>More Histograms</p>
+<ul>
+	<li>Looking for data? Andy Kirk has a <a href="http://www.visualisingdata.com/2017/02/archiving-collection-places-access-data/">comprehensive list of sources</a>.</li>
+	<li>Steph Curry data from <a href="http://www.basketball-reference.com/players/c/curryst01.html">Basketball Reference</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Wrap-up: Can we reverse-engineer human perception? </li>
+		<li>Data: grouping. </li>
+		<li>Context: Boring distributions</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 200;
+var width = 300;
+var padding = 20;
+
+var threePointCounter = d3.histogram()
+.thresholds(15)
+.domain([0,15]);
+
+var randomPoisson = function(rate) {
+	var x = Math.random();
+	var i = 0;
+	var threshold = Math.exp(-rate);
+	while (x > threshold) {
+		i++;
+		x -= threshold;
+		threshold *= rate / i;
+	}
+	return i;
+}
+
+var randomPoissons = function(n, rate) {
+	var samples = [];
+	for (var i = 0; i < n; i++) {
+		samples.push(randomPoisson(rate));
+	}
+	return samples;
+}
+
+function histogram(bins) {
+	var svg = d3.select("#plot").append("svg")
+	.attr("height", height).attr("width", width);
+
+	var xBands = d3.scaleBand()
+	.domain(bins.map(function (bin) {
+		 return bin.x0;
+	 }))
+	.range([padding, width-padding]);
+
+	var yScale = d3.scaleLinear()
+	.domain([0,
+		d3.max(bins, function (bin) {
+			 return bin.length;
+		 }) ])
+	.range([height - padding, padding]);
+	
+	console.log(bins);
+
+	bins.forEach(function (bin) {
+		svg.append("rect").attr("class", "bar")
+		.attr("x", xBands(bin.x0))
+		.attr("y", yScale(bin.length))
+		.attr("width", xBands.bandwidth() - 2)
+		.attr("height", yScale(0) - yScale(bin.length));
+		
+		svg.append("text").attr("class", "label")
+		.attr("x", xBands(bin.x0) + xBands.bandwidth() / 2)
+		.attr("y", yScale(0) + (padding / 2))
+		.text(bin.x0);
+	});
+}
+
+var curryData;
+
+// Data from http://www.basketball-reference.com/players/c/curryst01.html
+
+d3.csv("curry2017.csv", function (error, data) {
+	if (error) { console.log(error); }
+	
+	curryData = data;
+	var threePoints = curryData.map(function (d) { return Number(d["3P"]); }); // What's the correct value?
+	console.log(threePoints);
+	console.log(d3.mean(threePoints), d3.variance(threePoints));
+	
+	histogram(threePointCounter(threePoints));
+	
+	// What would a similar Poisson sample look like?
+	// Is this season consistent with Curry's career average?
+	
+	var x = randomPoissons(57, 5.1);
+	histogram(threePointCounter(x));
+	console.log(d3.mean(x), d3.variance(x));
+	
+});
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

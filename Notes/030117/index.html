@@ -1,0 +1,96 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya|Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+rect.bar { fill: #4169e1; }
+text.label {
+	fill: #888;
+	font-size: x-small;
+	dominant-baseline: middle; 
+	text-anchor: middle;
+}
+
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, March 1</h3>
+
+<div>
+	<p>Happy <a href="https://en.wikipedia.org/wiki/Saint_David's_Day">St. David's Day</a>!</p>
+<ul>
+	<li>Examples of questions we have when <a href="projectfeedback.txt">grading projects</a>, partly inspired by <a href="http://people.ischool.berkeley.edu/~hearst/papers/chi2016_oevfinal.pdf">Hearst et al.</a></li>
+	<li>Think about these as we look at <a href="https://www.nytimes.com/interactive/2017/02/28/upshot/trump-sounds-different-tone-in-first-address-to-congress.html">Trump goes positive</a> and <a href="https://www.bloomberg.com/graphics/2017-trump-mexico-wall/">Here’s What We Know About Trump’s Mexico Wall</a>.</li>
+	<li>The Heer/Bostock <a href="https://pdfs.semanticscholar.org/532e/d73c71101fc64e4c307d7d932d4c90140487.pdf">Tour through the Visualization Zoo</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Context: Boring distributions</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 200;
+var width = 300;
+var padding = 20;
+
+var randomPoisson = function(rate) {
+	var x = Math.random();
+	var i = 0;
+	var threshold = Math.exp(-rate);
+	while (x > threshold) {
+		i++;
+		x -= threshold;
+		threshold *= rate / i;
+	}
+	return i;
+}
+
+var randomPoissons = function(n, rate) {
+	var samples = [];
+	for (var i = 0; i < n; i++) {
+		samples.push(randomPoisson(rate));
+	}
+	return samples;
+}
+
+var cityData;
+
+// Data from Wikipedia
+
+d3.tsv("crime.tsv", function (error, data) {
+	if (error) { console.log(error); }
+	
+	cityData = data;
+	
+	var svg = d3.select("#plot").append("svg")
+	.attr("height", height).attr("width", width);
+	
+});
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

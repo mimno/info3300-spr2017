@@ -1,0 +1,236 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+input.slider { width: 300px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, March 20</h3>
+
+<div>
+<ul>
+	<li>Reflections on <a href="https://medium.com/@dominikus/the-end-of-interactive-visualizations-52c585dcafcb#.a2futdtt4">the death of interactive graphics</a>. What do you think?</li>
+	<li>Fun: <a href="http://codepen.io/nerdmanship/full/xgmBKg/">Miyazaki tribute in SVG/JS</a>. Can you figure out how it works?</li>
+	<li>For today: What factors influence <a href="https://en.wikipedia.org/wiki/Programme_for_International_Student_Assessment">International Math test scores</a>?</li>
+</ul>
+</div>
+
+<!-- Data sources, all via Wikipedia
+
+2015 PISA Math: https://en.wikipedia.org/wiki/Programme_for_International_Student_Assessment (OECD)
+GDP per capita: https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)_per_capita (IMF)
+Income Inequality: https://en.wikipedia.org/wiki/List_of_countries_by_income_equality (UN, WB, CIA)
+Human Development Index: https://en.wikipedia.org/wiki/List_of_countries_by_Human_Development_Index (UN)
+Education spending as % of GDP: https://en.wikipedia.org/wiki/List_of_countries_by_spending_on_education_(%25_of_GDP) (World bank)
+
+-->
+
+<div>
+	<ul>
+		<li>How does regression work with multiple inputs?</li>
+		<li>What can go wrong when we integrate data sources?</li>
+		<li>How do we handle interaction?</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+// What are the largest and smallest data values?
+var extent = [200, 600];
+
+var xScale = d3.scaleLinear().domain(extent).range([0, width]);
+var yScale = d3.scaleLinear().domain(extent).range([height, 0]);
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ (height) + ")");
+svg.append("text").attr("x", width / 2).attr("y", height + 35).text("Predicted PISA");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis);
+svg.append("text").attr("transform", "rotate(270)")
+.attr("x", -width / 2).attr("y", -25).text("Actual PISA");
+
+var identityLine = svg.append("line")
+.attr("class", "estimated")
+.attr("x1", xScale(extent[0]))
+.attr("y1", yScale(extent[0]))
+.attr("x2", xScale(extent[1]))
+.attr("y2", yScale(extent[1]))
+.style("stroke", "#e41a1c");
+
+var label = svg.append("text");
+
+var normalGenerator = d3.randomNormal();
+
+var points = [];
+
+var predictedVariable = "PISA";
+var inputVariables = ["Income", "Inequality", "EduSpend", "HDI"];
+var variableMean = {};
+var variableStdDev = {};
+
+var randomModel = function () {
+	var model = { intercept: 0.0 };
+	
+	inputVariables.forEach(function (variable) {
+		model[variable] = normalGenerator() * 0.01;
+	});
+	
+	return model;
+}
+
+var model = randomModel();
+
+// Get the "residual", or difference between observed value and predicted value
+function calculateErrors(points, model) {
+	points.forEach(function (point) {
+		// Y = ... + b
+		point["prediction"] = model.intercept;
+		inputVariables.forEach(function (variable) {
+			// Y = mx...
+			point["prediction"] += model[variable] * point[variable];
+		});
+		// Real Y - our current guess
+		point.error = point[predictedVariable] - point["prediction"];
+	});
+}
+
+// Display the squared loss criterion
+function squaredError() {
+	return d3.sum(points, function (point) {
+		return point.error * point.error;
+	});
+}
+
+var lossFunction = squaredError;
+var rounder = d3.format(".5g");
+
+var modelText = svg.append("text")
+.attr("id", "status")
+.attr("x", 10).attr("y", 30)
+.text("Loss: " +
+rounder(lossFunction()));
+
+// Save data values outside the callback function. (Useful for debugging.)
+var pisa, gdp, education, gini, hdi;
+
+d3.queue()
+.defer(d3.tsv, "pisa.txt")
+.defer(d3.tsv, "gdp.txt")
+.defer(d3.tsv, "education.txt")
+.defer(d3.tsv, "gini.txt")
+.defer(d3.tsv, "hdi.txt")
+.await(function (error, _pisa, _gdp, _education, _gini, _hdi) {
+	points = [];
+	gdp = d3.nest().key(function (d) { return d.Country; }).map(_gdp);
+	education = d3.nest().key(function (d) { return d.Country; }).map(_education);
+	gini = d3.nest().key(function (d) { return d.Country; }).map(_gini);
+	hdi = d3.nest().key(function (d) { return d.Country; }).map(_hdi);
+	
+	_pisa.forEach(function (country) {
+		var countryName = country.Country;
+		try {
+			country["PISA"] = country["PISA"];
+			country["Income"] = gdp.get(countryName)[0]["GDP"]);
+			country["EduSpend"] = education.get(countryName)[0]["Education"];
+			country["Inequality"] = gini.get(countryName)[0]["WBGini"];
+			country["HDI"] = hdi.get(countryName)[0]["HDI"];
+			
+			points.push(country);
+		} catch (error) { 
+			console.log("problem with " + countryName);
+		}
+	});
+	
+	model.intercept = d3.mean(points, function (d) { return d[predictedVariable]; });
+	
+	var slidersDiv = d3.select("#plot").append("div")
+	.style("float", "right");
+	
+	slidersDiv
+	.append("div").text("Intercept")
+	.append("div")
+	.append("input").attr("type", "range").attr("class", "slider")
+	.attr("min", model.intercept - 200)
+	.attr("max", model.intercept + 200).attr("step", 2)
+	.attr("value", model.intercept)
+	.on("input", function () {
+		model.intercept = Number(this.value);
+		display();
+	});
+	
+	inputVariables.forEach(function (variable) {
+		variableMean[variable] = d3.mean(points, function (d) { return d[variable]; });
+		variableStdDev[variable] = d3.deviation(points, function (d) { return d[variable]; });
+		
+		var varMin = -30 / variableStdDev[variable];
+		var varMax = 30 / variableStdDev[variable];
+		var step = (varMax - varMin) / 100;
+		slidersDiv
+		.append("div").text(variable)
+		.append("div")
+		.append("input").attr("type", "range").attr("class", "slider")
+		.attr("min", varMin).attr("max", varMax).attr("step", step).attr("value", model[variable])
+		.on("input", function () {
+			model[variable] = Number(this.value);
+			display();
+		});
+	});
+	
+	display();
+});
+
+function display() {
+	calculateErrors(points, model);
+
+	var circles = svg.selectAll("circle").data(points);
+	
+	circles.enter()
+	.append("circle")
+	.merge(circles)
+	.attr("r", 5)
+	.on("click", function (d) {
+		label.attr("x", xScale(d["prediction"]))
+		.attr("y", yScale(d[predictedVariable]))
+		.text(d.Country);
+	})
+	.style("opacity", 0.4)
+	.attr("cx", function (d) { return xScale(d["prediction"]); })
+	.attr("cy", function (d) { return yScale(d[predictedVariable]); });
+
+	modelText
+	.text("Loss: " + rounder(lossFunction()));	
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

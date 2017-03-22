@@ -1,0 +1,238 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+circle { fill: rgb(97,24,44);}
+input.slider { width: 300px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, March 22</h3>
+
+<div>
+<ul>
+	<li>Homework 5 is out on CMS, due Tuesday.</li>
+	<li>Inspiration: <a href="http://ventrella.com/clusters/">Really cool particle simulator</a>, <a href="https://projects.fivethirtyeight.com/2017-march-madness-predictions/womens/">538's March Madness predictions</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>How do we train linear regression with more than one input? Why is it hard?</li>
+		<li>What does a gradient tell us, and how can we use it?</li>
+		<li>What can go wrong with gradient descent?</li>
+		<li>Strategies for showing lots of points with the same value.</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var xScale = d3.scaleLinear().domain([-1, 11]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-1, 11]).range([height, 0]);
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ (height) + ")");
+svg.append("text").attr("x", xScale(4)).attr("y", height + 35).text("Predicted Quality");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis);
+svg.append("text").attr("x", xScale(4)).attr("y", height + 35).text("Predicted Quality");
+
+var normalGenerator = d3.randomNormal();
+var rounder = d3.format(".5g");
+
+var points = [];
+
+/*** Construct a linear model ***/
+
+var predictedVariable = "quality";
+var inputVariables = ["intercept", "fixed acidity","volatile acidity","citric acid","residual sugar","chlorides","free sulfur dioxide","total sulfur dioxide","density","pH","sulphates","alcohol"];
+
+var randomModel = function () {
+	var model = { };
+	
+	inputVariables.forEach(function (variable) {
+		model[variable] = normalGenerator() * 0.01;
+	});
+	
+	return model;
+}
+
+function calculateErrors(points, model) {
+	points.forEach(function (point) {
+		point["prediction"] = 0.0;
+		inputVariables.forEach(function (variable) {
+			point["prediction"] += model[variable] * point[variable];
+		});
+		point.error = point[predictedVariable] - point["prediction"];
+	});
+}
+
+
+function squaredError() {
+	return d3.sum(points, function (point) {
+		return point.error * point.error;
+	});
+}
+
+var model = randomModel();
+var lossFunction = squaredError;
+
+/*** Display and interact with the model ***/
+
+var regressionLine = svg.append("line")
+.attr("class", "estimated")
+.attr("x1", xScale(-1))
+.attr("y1", yScale(-1))
+.attr("x2", xScale(11))
+.attr("y2", yScale(11))
+.style("stroke", "#e41a1c");
+
+var modelText = svg.append("text")
+.attr("id", "status")
+.attr("x", 10).attr("y", 30)
+.text("Squared Error: " + rounder(lossFunction()));
+
+d3.select("#squaredLoss").on("click", function () {
+	lossFunction = squaredError;
+	residuals.style("stroke", "blue");
+	maxResidual.style("stroke", "none");
+	squaredResiduals.style("fill", "blue");
+});
+
+var slidersDiv = d3.select("#plot").append("div")
+.style("float", "right");
+inputVariables.forEach(function (variable) {
+	slidersDiv
+	.append("div").text(variable)
+	.append("div")
+	.append("input").attr("type", "range").attr("class", "slider")
+	.attr("id", "slider_" + variable)
+	.attr("min", variable === "intercept" ? "-10.0" : "-1.0")
+	.attr("max", variable === "intercept" ? "10.0" : "1.0")
+	.attr("step", "0.05").attr("value", model[variable])
+	.on("input", function () {
+		model[variable] = Number(this.value);
+		display();
+	});
+});
+
+/*** Load data with an unusual field delimiter ***/
+var semicolonFormat = d3.dsvFormat(";");
+
+d3.request("winequality-red.csv")
+.response(function (response) {
+	rawText = response.responseText;
+	return semicolonFormat.parse(response.responseText, stringsToNumbers);
+})
+.get(initialize);
+
+function jitter() { return 20 * (Math.random() - 0.5); }
+function stringsToNumbers(row) {
+	row["intercept"] = 1.0;
+	row["jitter"] = jitter();
+	var fieldNames = Object.keys(row);
+	for (var i = 0; i < fieldNames.length; i++) {
+		row[fieldNames[i]] = Number(row[fieldNames[i]]);
+	}
+	return row;
+}
+
+function initialize(error, data) {
+	points = data;//.filter(function () { return Math.random() < 0.15; });
+	
+	var variableMean = {};
+	var variableStdDev = {};
+	
+	inputVariables.forEach(function (variable) {
+		variableMean[variable] = d3.mean(points, function (d) { return d[variable]; });
+		variableStdDev[variable] = d3.deviation(points, function (d) { return d[variable]; });
+	});
+	
+	points.forEach(function (point) {
+		inputVariables.forEach(function (variable) {
+			if (variable !== "intercept") {
+				// Normalize inputs
+			}
+		});
+	});
+	
+	
+	display();
+}
+
+function calculateGradient(points, model) {
+	var gradient = {};
+	inputVariables.forEach(function (variable) {
+		gradient[variable] = 0.0;
+	});
+	
+	points.forEach(function (point) {
+		inputVariables.forEach(function (variable) {
+			// What goes here?
+		});
+	});
+	
+	return gradient;
+}
+
+function updateModel(model, gradient, learningRate) {
+	inputVariables.forEach(function (variable) {
+		// What goes here?
+	});
+	display();
+}
+
+function display() {
+	calculateErrors(points, model);
+
+	var circles = svg.selectAll("circle").data(points);
+	
+	circles.enter()
+	.append("circle")
+	.merge(circles)
+	.attr("r", 5)
+	.style("opacity", 0.4)
+	.attr("cx", function (d) { return xScale(d["prediction"]); })
+	.attr("cy", function (d) { return yScale(d[predictedVariable]); });
+
+	modelText
+	.text("Squared Error: " + rounder(lossFunction()));
+	
+	inputVariables.forEach(function (variable) {
+		d3.select("#slider_" + variable)
+		.property("value", model[variable]);
+	});
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

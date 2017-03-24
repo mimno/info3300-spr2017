@@ -1,0 +1,155 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link href='https://fonts.googleapis.com/css?family=Open+Sans+Condensed:300' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+circle { fill: rgb(97,24,44);}
+input.slider { width: 300px; }
+text { font-size: xx-small; font-family: "Open Sans Condensed", Calibri; opacity: 0.3; text-anchor: middle; dominant-baseline: central; }
+text:hover { fill: blue; opacity: 1.0; font-weight: bold; font-size: xx-large; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, March 24</h3>
+
+<div>
+<ul>
+	<li>Project 2 groups are available on Piazza.</li>
+	<li></li>
+	<li>Real Donald Trump? Android vs. iPhone data from <a href="http://varianceexplained.org/r/trump-tweets/">David Robinson</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>What if we have thousands of predictors? Can we set values automatically?</li>
+		<li>Naive Bayes classification</li>
+		<li>Smoothing and missing data</li>
+		<li>Prediction from probabilities</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 800;
+var width = 1200;
+var padding = 50;
+
+var smoothing = 0.1;
+
+var countMinMax = [1, 800];
+
+var svg = d3.select("#plot").append("svg")
+   .attr("height", height).attr("width", width);
+
+var xScale = d3.scaleLinear()
+  .domain([-6, 6]).range([padding, width - padding]);
+  
+var yScale = d3.scaleLinear()
+  .domain(countMinMax).range([height - padding, padding]);
+
+var xAxis = d3.axisBottom().scale(xScale);
+svg.append("g")
+  .attr("class", "axis")
+  .attr("transform", "translate(0, " + yScale(countMinMax[0]) + ")")
+  .call(xAxis);
+
+var yAxis = d3.axisLeft().scale(yScale);
+svg.append("g")
+	.attr("class", "axis")
+	.attr("transform", "translate(" + padding + ", 0)")
+	.call(yAxis);
+
+svg.append("line")
+	.attr("x1", xScale(0))
+	.attr("x2", xScale(0))
+	.attr("y1", yScale(countMinMax[0]))
+	.attr("y2", yScale(countMinMax[1]))
+	.style("stroke", "#ddd");
+
+var wordGroup = svg.append("g");
+
+var twitterData = [];
+var wordPhoneCounts = { };
+var wordTotals = { };
+var phoneTotals = { iPhone : 0, Android : 0 };
+var phoneTweets = { iPhone : 0, Android : 0 };
+
+function parseTweet (row) {
+	row.phone = row.statusSource.indexOf("Android") != -1 ? "Android" : "iPhone";
+	phoneTweets[row.phone] += 1;
+	
+	row.label = row.phone === "Android" ? 1.0 : -1.0;
+	row.tokens = row.text.split(" ");
+	row.jitter = jitter();
+	
+	row.tokens.forEach(function (token) {
+		// Initialize the word if we haven't seen it already
+		if (! wordPhoneCounts[token]) {
+			wordPhoneCounts[token] = { "Android" : 0, "iPhone" : 0 };
+			wordTotals[token] = 0;
+		}
+		
+		wordPhoneCounts[token][row.phone] += 1;
+		wordTotals[token] += 1;
+		phoneTotals[row.phone] += 1;
+	});
+	
+	twitterData.push(row);
+}
+
+var vocabulary;
+var words;
+
+function prob(word, phone) {
+	return (wordPhoneCounts[word][phone]) /
+	(phoneTotals[phone]);
+}
+
+function tweetScore(tokens) {
+	var sum = 0.0;
+	tokens.forEach(function (w) {
+		// Add up something for each token
+	});
+	return sum / tokens.length;
+}
+
+d3.tsv("trump_tweets.tsv", parseTweet, function (error, data) {
+	vocabulary = Object.keys(wordPhoneCounts);
+	
+	words = wordGroup.selectAll("text").data(vocabulary);
+
+	words.enter().append("text")
+	.attr("y", function(w) { return yScale(wordTotals[w]); })
+	.attr("x", function(w) { 
+		// What should we do here?
+	})
+	.text(function (w) { return w; } );
+	
+});
+
+function jitter() { return 20 * (Math.random() - 0.5); }
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

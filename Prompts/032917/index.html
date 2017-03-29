@@ -1,0 +1,207 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line { stroke: #aaa; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, March 29</h3>
+
+<div>
+<ul>
+	<li>Be the grader: Factors affecting Brexit from <a href="https://www.bloomberg.com/graphics/2017-brexit-by-numbers/">Bloomberg</a>.</li>
+	<li>Be the grader: Can I use <a href="http://caniuse.com/#feat=arrow-functions">JS arrow functions</a>?</li>
+	<li>Inspiration: <a href="http://www.vizualism.nl/infographic-taxonomy/">Infographic Taxonomy</a>.</li>
+	<li>Another view of <a href="http://bl.ocks.org/blacki/ebba08223eba20b56b62">k-means equilibria</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Can we find groups of data points automatically?</li>
+		<li>Choices: how do we represent a cluster? how many clusters do we use? what does "close" mean?</li>
+		<li>Can we break this algorithm?</li>
+	</ul>
+</div>
+
+<div>
+	<button id="findclosest">Find Closest</button>
+	<button id="moveMeans">Move Means</button>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+// This function will generate the same sequence of random-looking numbers for everyone.
+// We'll use this when we want to look at the same values, and Math.random() when
+//  we want to vary results between students.
+// From http://stackoverflow.com/questions/521295/javascript-random-seeds
+var seed = 3;
+function seededRandom() {
+    var x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
+
+var svg = d3.select("#plot").append("svg").attr("height", height).attr("width", width);
+	
+svg.append("defs")
+.append("filter").attr("id", "blur")
+.attr("x", "-50%").attr("y", "-50%")
+.attr("height", "200%").attr("width", "200%")
+.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", 10);
+
+var lines, circles, centroids;
+
+var gaussian = d3.randomNormal();
+
+var xScale = d3.scaleLinear().domain([0,1]).range([padding, width - padding]);
+var yScale = d3.scaleLinear().domain([0,1]).range([height - padding, padding]);
+
+function makeClusters(numClusters, pointsPerCluster, spread) {
+	var points = [];
+	
+	for (var clusterID = 0; clusterID < numClusters; clusterID++) {
+		var center = { x: seededRandom(), y: seededRandom() };
+
+		// Place a blurry indication of where the cluster "should" be.
+		svg.append("circle")
+		.attr("class", "realCenter")
+		.attr("cx", xScale(center.x))
+		.attr("cy", yScale(center.y))
+		.attr("r", 40)
+		.style("fill", "#9c9")
+		.attr("filter", "url(#blur)");
+		 
+		for (var i = 0; i < pointsPerCluster; i++) {
+			points.push({
+				originalCluster: clusterID,
+				cluster: -1,
+				x: center.x + gaussian() * spread,
+				y: center.y + gaussian() * spread
+			});
+		}
+	}
+	
+	return points;
+}
+
+var points = makeClusters(3, 10, 0.1);
+
+circles = svg.selectAll(".point").data(points);
+
+circles.enter().append("circle")
+.attr("class", "point")
+.attr("cx", function(d) { return xScale(d.x); })
+.attr("cy", function(d) { return yScale(d.y); })
+.attr("r", 3)
+.style("fill", "green")
+.style("opacity", 0.5);
+
+lines = svg.selectAll("line").data(points)
+.enter().append("line")
+.attr("x1", function(d) { return xScale(d.x); })
+.attr("y1", function(d) { return yScale(d.y); })
+.attr("x2", function(d) { return xScale(d.x); })
+.attr("y2", function(d) { return yScale(d.y); });
+
+centroids = new Array(3);
+for (var i = 0; i < centroids.length; i++) {
+	centroids[i] = { x: seededRandom(), y: seededRandom() };
+}
+
+var centroidCircles = svg.selectAll(".centroid").data(centroids)
+.enter().append("circle")
+.attr("class", "centroid")
+.attr("r", 5)
+.style("fill", "orange")
+.attr("cx", function(d) { return xScale(d.x); })
+.attr("cy", function(d) { return yScale(d.y); });
+
+function moveMeans() {
+	centroids.forEach(function (centroid, i) {
+		var assignedPoints = 
+			points.filter(function (point) { return point.cluster == i; });
+		
+		// How do we update the centroids if we know how 
+		//  they relate to data points?
+	});
+	
+	lines.transition().duration(1000).attr("x2", function (point) {
+		return xScale(centroids[point.cluster].x);
+	})
+	.attr("y2", function (point) {
+		return yScale(centroids[point.cluster].y);
+	});
+	
+	centroidCircles.transition().duration(1000)
+	.attr("cx", function(d) { return xScale(d.x); })
+	.attr("cy", function(d) { return yScale(d.y); });
+}
+
+function nearest(point, candidates) {
+	var nearest;
+	var shortestDistance = Number.MAX_VALUE;
+	for (var i = 0; i < candidates.length; i++) {
+		var c = candidates[i];
+		var distance = Math.sqrt( 
+			(c.x - point.x) * (c.x - point.x) +
+			(c.y - point.y) * (c.y - point.y)
+		);
+	
+		if (distance < shortestDistance) {
+			shortestDistance = distance;
+			nearest = i;
+		}
+	}
+	return nearest;
+}
+
+function findClosest() {
+	var converged = true;
+	
+	points.forEach(function (point) {
+		var newCluster = nearest(point, centroids);
+		if (newCluster !== point.cluster) { converged = false; }
+		point.cluster = newCluster;
+	});
+	
+	lines.transition().duration(1000).attr("x2", function (point) {
+		return xScale(centroids[point.cluster].x);
+	})
+	.attr("y2", function (point) {
+		return yScale(centroids[point.cluster].y);
+	});
+	
+	return converged;
+}
+
+d3.select("#movemeans").on("click", moveMeans);
+d3.select("#findclosest").on("click", findClosest);
+
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

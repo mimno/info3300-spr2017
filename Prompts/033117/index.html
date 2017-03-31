@@ -1,0 +1,218 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line { stroke: #aaa; }
+path.tile {
+	fill: none;
+	stroke: #aaa;
+	stroke-width: 3;
+}
+text { fill: #aaa; text-anchor: middle; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, March 31</h3>
+
+<div>
+<ul>
+	<li>Interactive graphs may <a href="https://www.vis4.net/blog/posts/in-defense-of-interactive-graphics/">not actually be dead</a> says Gregor Aisch.</li>
+	<li>How does k-means relate to <a href="https://en.wikipedia.org/wiki/Voronoi_diagram">Voronoi diagrams</a>?</li>
+	<li>Inspiration: Bostock on <a href="https://bl.ocks.org/mbostock/4060366">Voronoi tesselations</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Clustering on real data. What does "distance" mean?</li>
+		<li>Voronoi tesselation and a mysterious "bug".</li>
+	</ul>
+</div>
+
+<div>
+	<button id="findclosest">Find Closest</button>
+	<button id="moveMeans">Move Means</button>
+	<span id="location"></span>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var svg = d3.select("#plot").append("svg").attr("height", height).attr("width", width);
+var clusterLayer = svg.append("g");
+
+var voronoi;
+var voronoiLayer = svg.append("g");
+	
+var xScale, yScale;
+	
+// Visible elements
+var lines, circles, clusterCircles;
+
+// Abstract data elements
+var centroids, points;
+
+var countries;
+// Download global health data, sourced from WHO, formatted by the Guardian
+d3.csv("health.csv", function (error, data) {
+	countries = data;
+
+	points = countries.map(function (country) {
+		// Create shorter variable names
+		return {
+			x: Number(country["Doctors, per 10,000 population"]),
+		 	y: Number(country["Health spending, % of GDP"]),
+			label: country["Location"]
+		};
+	});
+
+	xScale = d3.scaleLinear()
+	.domain(d3.extent(points, function (point) {
+		return point.x;
+	})).range([padding, width - padding]);
+	
+	yScale = d3.scaleLinear()
+	.domain(d3.extent(points, function (point) {
+		return point.y;
+	})).range([height - padding, padding]);
+
+	clusterLayer.append("text").attr("transform", "rotate(270)")
+	.attr("x", -0.5 * height).attr("y", 20).text("(lower) ← health spending → (higher)");
+	clusterLayer.append("text")
+	.attr("x", .5 * width).attr("y", height - 5).text("(fewer) ← doctors → (more)");
+	clusterLayer.append("text").attr("id", "lengths")
+	.attr("x", 0.9 * width).attr("y", 20);
+
+	lines = clusterLayer.selectAll("line").data(points)
+	.enter().append("line")
+	.attr("x1", function(d) { return xScale(d.x); })
+	.attr("y1", function(d) { return yScale(d.y); })
+	.attr("x2", function(d) { return xScale(d.x); })
+	.attr("y2", function(d) { return yScale(d.y); })
+	.style("stroke", "#aaa");
+
+	circles = clusterLayer.selectAll(".point").data(points)
+	.enter().append("circle")
+	.attr("class", "point")
+	.attr("cx", function(d) { return xScale(d.x); })
+	.attr("cy", function(d) { return yScale(d.y); })
+	.attr("r", 3)
+	.style("fill", "green")
+	.style("opacity", 0.5)
+	.on("mouseover", function (d) {
+		d3.select("#location").text(d.label);
+	});
+
+	// Hmmm... how many clusters?
+	centroids = new Array(5);
+	for (var i = 0; i < centroids.length; i++) {
+		// Initialize from a randomly chosen point
+		var randomPoint = points[Math.floor(Math.random() * points.length)];
+		centroids[i] = { x: randomPoint.x, y: randomPoint.y };
+	}
+
+	centroidCircles = svg.selectAll(".centroid").data(centroids)
+	.enter().append("circle")
+	.attr("class", "centroid")
+	.attr("cx", function(d) { return xScale(d.x); })
+	.attr("cy", function(d) { return yScale(d.y); })
+	.attr("r", 5)
+	.style("fill", "orange")
+	.style("opacity", 0.5);
+	
+	/*
+	// This draws from https://bl.ocks.org/mbostock/4060366 -- Thanks Mike!
+	voronoi = d3.voronoi().extent([[0,0], [width,height]])
+	.x(function (d) { return xScale(d.x); })
+	.y(function (d) { return yScale(d.y); });
+
+	var tiles = voronoi.polygons(centroids);
+	console.log(tiles);
+	voronoiLayer.selectAll("path").data(tiles)
+	.enter().append("path")
+	.attr("class", "tile")
+	.attr("d", function (d) { return d ? "M" + d.join("L") + "Z" : null; });
+	*/
+});
+
+d3.select("#movemeans").on("click", function () {
+	centroids.forEach(function (centroid, i) {
+		var assignedPoints = 
+			points.filter(function (point) { return point.cluster == i; });
+		
+		centroid.x = d3.mean(assignedPoints, function (point) { return point.x; });
+		centroid.y = d3.mean(assignedPoints, function (point) { return point.y; });
+	});
+	
+	centroidCircles.transition().duration(1000)
+	.attr("cx", function(d) { return xScale(d.x); })
+	.attr("cy", function(d) { return yScale(d.y); });	
+	
+	lines.transition().duration(1000).attr("x2", function (point) {
+		return xScale(centroids[point.cluster].x);
+	})
+	.attr("y2", function (point) {
+		return yScale(centroids[point.cluster].y);
+	});
+});
+
+d3.select("#findclosest").on("click", function () {
+
+	var sum = 0.0;
+	points.forEach(function (point) {
+		var nearest;
+		var shortestDistance = Number.MAX_VALUE;
+		for (var i = 0; i < centroids.length; i++) {
+			var c = centroids[i];
+			
+			var distance = Math.sqrt( 
+				(c.x - point.x) * (c.x - point.x) +
+				(c.y - point.y) * (c.y - point.y)
+			);
+		
+			if (distance < shortestDistance) {
+				shortestDistance = distance;
+				nearest = i;
+			}
+		}
+		point.cluster = nearest;
+		sum += shortestDistance;
+		
+	});
+	d3.select("#lengths").text(sum);
+	
+	lines.transition().duration(1000).attr("x2", function (point) {
+		return xScale(centroids[point.cluster].x);
+	})
+	.attr("y2", function (point) {
+		return yScale(centroids[point.cluster].y);
+	});
+
+});
+
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

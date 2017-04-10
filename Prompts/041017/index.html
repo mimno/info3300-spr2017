@@ -1,0 +1,259 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line.axis { stroke: #ddd; }
+line#v1 { fill: none; stroke: #e41a1c; marker-end: url(#redarrow); }
+line#v2 { fill: none; stroke: #377eb8; marker-end: url(#bluearrow); }
+line.random { fill: none; stroke: #f59322; opacity: 0.3; }
+.red { stroke: #e41a1c; fill: #e41a1c; }
+.blue { stroke: #377eb8; fill: #377eb8; }
+text {
+	/* From http://stackoverflow.com/questions/826782/css-rule-to-disable-text-selection-highlighting */
+  -webkit-touch-callout: none; 
+  -webkit-user-select: none;  
+  -khtml-user-select: none; 
+  -moz-user-select: none;  
+  -ms-user-select: none;
+  user-select: none;
+}
+</style>
+</head>
+<body>
+<h3>Prompt for Monday, April 10. Cosine distance, Locality-sensitive hashing.</h3>
+
+<div>
+<ul>
+	<li>FOR WEDNESDAY: Watch <a href="https://www.youtube.com/watch?v=BhY-un6JURA">Solve Every Statistics Problem with One Weird Trick</a> (~5m).</li>
+	<li>The latest update on whether interactive graphics are dead,  <a href="http://mapbrief.com/2017/04/06/few-interact-with-our-interactive-maps-what-can-we-do-about-it/">for maps</a>.</li>
+	<li>On <a href="https://lisacharlotterost.github.io/2017/04/07/embracing-curiosity/">embracing curiosity</a> by Lisa Charlotte Rost.</li>
+	<li>Be the grader: <a href="https://courses.engr.illinois.edu/cs199205/sp2016/discovery/gpa_of_every_course_at_illinois/">a student project from UIUC</a>.</li>
+	<li>LSH, an interface inspired by <a href="https://www.cs.jhu.edu/~vandurme/papers/VanDurmeLallACL10-slides.pdf">Benjamin van Durme</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Are data vectors close? How does this relate to cosines?</li>
+		<li>Randomized approximations to cosine similarity.</li>
+	</ul>
+</div>
+
+<div><button id="addVector">Add Random Classifier</button> Click to move the red vector, click and drag to move both vectors:</div>
+<div id="plot">
+	<svg>
+		<defs>
+			<!-- Inspired by http://bl.ocks.org/tomgp/d59de83f771ca2b6f1d4 -->
+		<marker id="redarrow" viewBox="0 -5 10 10" refX="5" refY="0" 
+			markerWidth="4" markerHeight="4" orient="auto">
+			<path d="M0,-5L10,0,L0,5" class="arrowHead red"/>
+		</marker>
+		<marker id="bluearrow" viewBox="0 -5 10 10" refX="5" refY="0" 
+			markerWidth="4" markerHeight="4" orient="auto">
+			<path d="M0,-5L10,0,L0,5" class="arrowHead blue"/>
+		</marker>
+		</defs>
+	</svg>
+</div>
+
+<script id="notes">
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var mouseDown = false;
+
+var svg = d3.select("svg").attr("height", height).attr("width", width);
+var xScale = d3.scaleLinear().domain([-1.6, 1.6]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-1.6, 1.6]).range([height, 0]);
+
+// Background elements
+
+svg.append("circle")
+.attr("cx", xScale(0))
+.attr("cy", yScale(0))
+.attr("r", xScale(1.0) - xScale(0.0))
+.style("fill", "f0f0f0");
+
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(0))
+.attr("x2", xScale(0))
+.attr("y1", yScale(-100))
+.attr("y2", yScale(100));
+
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(-100))
+.attr("x2", xScale(100))
+.attr("y1", yScale(0))
+.attr("y2", yScale(0));
+
+// Moveable elements
+
+var dataVectors = [normalize([0, 1]), normalize([1, 0])];
+
+var v1 = svg.append("line").attr("class", "arrow").attr("id", "v1")
+.style("stroke", "#e41a1c")
+.attr("x1", xScale(0)).attr("y1", yScale(0))
+.attr("x2", xScale(dataVectors[0][0])).attr("y2", yScale(dataVectors[0][1]));
+
+var v1bits = svg.append("text")
+.style("fill", "#e41a1c")
+.attr("x", xScale(dataVectors[0][0]))
+.attr("y", yScale(dataVectors[0][1]));
+
+var v2 = svg.append("line").attr("class", "arrow").attr("id", "v2")
+.style("stroke", "#377eb8")
+.attr("x1", xScale(0)).attr("y1", yScale(0))
+.attr("x2", xScale(dataVectors[1][0])).attr("y2", yScale(dataVectors[1][1]));
+
+var v2bits = svg.append("text")
+.style("fill", "#377eb8")
+.attr("x", xScale(dataVectors[1][0]))
+.attr("y", yScale(dataVectors[1][1]));
+
+var randomVectors = [];
+
+var formatter = d3.format(".3f");
+var cosineText = svg.append("text")
+.attr("x", 10)
+.attr("y", 30)
+.text("cosine: " + formatter(innerProduct(dataVectors[0], dataVectors[1])));
+
+var approxCosineText = svg.append("text")
+.attr("x", 10)
+.attr("y", 60)
+.text("not quite cosine: " + formatter(approximateCosine(dataVectors[0], dataVectors[1])));
+
+function addRandomVector() {
+	var randomAngle = Math.random() * 2 * Math.PI;
+	var vector = [Math.cos(randomAngle), Math.sin(randomAngle)];
+	
+	svg.append("line")
+	.attr("class", "random")
+	.attr("x1", xScale(-1.2 * vector[1]))
+	.attr("x2", xScale(1.2 * vector[1]))
+	.attr("y1", yScale(1.2 * vector[0]))
+	.attr("y2", yScale(-1.2 * vector[0]));
+	
+	randomVectors.push(vector);
+}
+
+function getBits(a) {
+	// Each of these random vectors is a classifier.
+	// A really terrible pointless classifier, but a 
+	//  classifier nonetheless.
+	return randomVectors.map(function (r) {
+		// Change this to the appropriate 
+		//  "classification" for vector a.
+		return 1;
+	});
+}
+
+function bitsToText(bits) {
+	return bits
+	.map(function (bit) { 
+		return bit == 1 ? "\u25cb" : "\u25cf";
+	})
+	.join("");
+}
+
+function approximateCosine(a, b) {
+	if (randomVectors.length == 0) { return 0; }
+	
+	var aBits = getBits(a);
+	var bBits = getBits(b);
+	
+	var differentSign = 0;
+	for (var i = 0; i < aBits.length; i++) {
+		/* What should we do here? */
+	}
+	
+	return Math.cos(Math.PI * differentSign / randomVectors.length);
+}
+
+function innerProduct(x, y) {
+	if (x.length != y.length) { console.log("vectors are not the same length"); }
+	var sum = 0.0;
+	for (var i = 0; i < x.length; i++) {
+		sum += x[i] * y[i]
+	}
+	return sum;
+}
+
+function normalize(vector) {
+	var length = Math.sqrt(d3.sum(vector, function (x) { return x * x; }));
+	return vector.map(function (x) { return x / length; });
+}
+
+function updateDisplay() {
+	v1
+	.attr("x2", xScale(dataVectors[0][0])).attr("y2", yScale(dataVectors[0][1]));
+
+	v1bits
+	.attr("x", xScale(dataVectors[0][0])).attr("y", yScale(dataVectors[0][1]))
+	.text(bitsToText(getBits(dataVectors[0])));
+	
+	v2
+	.attr("x2", xScale(dataVectors[1][0])).attr("y2", yScale(dataVectors[1][1]));
+	
+	v2bits
+	.attr("x", xScale(dataVectors[1][0])).attr("y", yScale(dataVectors[1][1]))
+	.text(bitsToText(getBits(dataVectors[1])));
+	
+	cosineText
+	.text("cosine: " + formatter(innerProduct(dataVectors[0], dataVectors[1])));
+	
+	approxCosineText
+	.text("not quite cosine: " + formatter(approximateCosine(dataVectors[0], dataVectors[1])));
+}
+
+// User interaction events
+
+d3.select("#addVector").on("click", function () {
+	addRandomVector();
+	updateDisplay();
+});
+
+svg.on("mousedown", function () {
+	var pixels = d3.mouse(this);
+	var vector = normalize([xScale.invert(pixels[0]), yScale.invert(pixels[1])]);
+    dataVectors[0] = vector;
+	
+	mouseDown = true;
+	updateDisplay();
+});
+
+svg.on("mousemove", function () {
+	if (! mouseDown) { return; }
+	var pixels = d3.mouse(this);
+	var vector = normalize([xScale.invert(pixels[0]), yScale.invert(pixels[1])]);
+    dataVectors[1] = normalize(vector);
+	
+	updateDisplay();
+});
+
+	
+svg.on("mouseup", function () {
+	mouseDown = false;
+});
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

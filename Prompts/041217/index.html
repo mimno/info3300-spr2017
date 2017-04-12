@@ -1,0 +1,258 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Slabo+27px" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Slabo 27px', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+.axis { opacity: 0.1; }
+circle.real { fill: #00f; opacity: 0.1; }
+circle.replicated { fill: #f00; opacity: 0.0; }
+
+@keyframes resample {
+	from { opacity: 0.5; }
+	95% { opacity: 0.5; }
+	to { opacity: 0.0; }
+}
+
+line.regression {
+	stroke-dasharray: 1000;
+	stroke-dashoffset: 1000;
+	animation: draw 3s linear forwards;	
+}
+@keyframes draw {
+	50% { stroke-dashoffset: 1000; }
+	to { stroke-dashoffset: 0; }
+}
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday, April 12</h3>
+
+<div>
+<ul>
+	<li>Motivation: what does it mean when adding or subtracting a few data points changes the result? <a href="https://en.wikipedia.org/wiki/Growth_in_a_Time_of_Debt">The case of Reinhart and Rogoff</a>.</li>
+	<li>Tools: <a href="https://css-tricks.com/svg-line-animation-works/">CSS animation</a> and Efron's <a href="https://en.wikipedia.org/wiki/Bootstrapping_(statistics)">Bootstrap</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>How can we evaluate confidence in a model?</li>
+		<li>How can we estimate variability without knowing a data-generating distribution?</li>
+		<li>What makes data sensitive to bootstrap samples?</li>
+	</ul>
+</div>
+
+<div id="header">
+<button id="bootstrap">Resample</button>
+<button id="clear">Clear</button>
+<div>
+<div>Replications: <span id="reps"></span></div>
+<div>Slope (real): <span id="slope"></span>; 90% Conf Int: [<span id="slope05"></span> , <span id="slope95"></span>]</div>
+</div>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var xExtent = [-3, 3];
+var yExtent = [-3, 3];
+
+var xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+var yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+// Helper functions to be used as callbacks
+var x = function (point) { return xScale(point.x); }
+var y = function (point) { return yScale(point.y); }
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(0) + ")").attr("class", "axis");
+svg.append("text").attr("x", width * 0.4).attr("y", height + 35).text("Input Variable");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis).attr("class", "axis").attr("transform", "translate("+ xScale(0) + ",0)");
+svg.append("text").attr("transform", "rotate(270) translate(-200, -24)").text("Prediction");
+
+// Plot a line from a linear model
+var line = function(model, color, type) {
+	svg.append("line").attr("class", "regression")
+	.attr("x1", xScale(xExtent[0])).attr("y1", yScale(xExtent[0] * model.slope + model.intercept))
+	.attr("x2", xScale(xExtent[1])).attr("y2", yScale(xExtent[1] * model.slope + model.intercept))
+	.style("stroke", color)
+	.style("stroke-width", type === "replicated" ? 2 : 4)
+	.style("opacity", type === "replicated" ? 0.3 : 1.0);
+}
+
+var normalGenerator = d3.randomNormal();
+
+// Sample 2D points from a noisy linear model
+function generateFrom(intercept, slope, noise, n) {
+	var points = [];
+	
+	for (var i = 0; i < n; i++) {
+		var x = normalGenerator();
+		var y = x * slope + intercept + noise * normalGenerator(); 
+		points.push({ x: x, y: y });
+	}
+	
+	return points;
+}
+
+// Calculate the optimal slope and intercept.
+function leastSquares(points) {
+	var model = { intercept: 0, slope: 0 };
+
+	if (points.length == 0) { return model; }
+
+	var meanX = d3.mean(points, function (d) { 
+		return d.x;
+	});
+
+	var meanY = d3.mean(points, function (d) { 
+		return d.y;
+	});
+
+	model.slope = d3.sum(points, function (d) {
+		return (d.x - meanX) * (d.y - meanY);
+	});
+	model.slope /= d3.sum(points, function (d) {
+		return (d.x - meanX) * (d.x - meanX);
+	});
+
+	model.intercept = meanY - model.slope * meanX;
+	return model;
+}
+
+var realCircles, replicatedCircles, realModel;
+var slopes;
+var intercepts;
+var formatter = d3.format(".3f");
+
+var points = generateFrom(0.0, -0.7, 0.3, 30);
+
+function init() {
+	// Reset everything
+	d3.selectAll("line.real").remove();
+	d3.selectAll("line.replicated").remove();
+	d3.selectAll("circle").remove();
+	slopes = [];
+	intercepts = [];
+
+	// Plot the real points
+	realCircles = svg.selectAll("circle.real")
+	.data(points).enter().append("circle")
+	.attr("class", "real")
+	.attr("cx", x).attr("cy", y)
+	.attr("r", 4);
+
+	// Plot the replicated points
+	replicatedCircles = svg.selectAll("circle.replicated")
+	.data(points).enter().append("circle")
+	.attr("class", "replicated")
+	.attr("cx", x).attr("cy", y)
+	.attr("r", 4)
+	.style("animation-name", "");
+
+	// Get the best linear fit for the real data
+	realModel = leastSquares(points);
+	line(realModel, "#00f", "real");
+	
+	d3.select("#reps").text(0);
+	d3.select("#slope").text(formatter(realModel.slope));
+	d3.select("#slope05").text("");
+	d3.select("#slope95").text("");
+}
+
+// For example, fifth percentile (0.05) of a list of length 20 should be index 1.
+// Related: https://gist.github.com/IceCreamYou/6ffa1b18c4c8f6aeaad2
+function percentile(list, p) {
+	var n = list.length;
+	if (p <= 1.0 / (n+1)) {
+		return list[0]
+	}
+	else if (p >= n / (n+1)) { 
+		return list[n-1];
+	}
+	else {
+		// Return a weighted combination
+		var integer = Math.floor(p * (n+1)); 
+		var fraction = (p * (n+1)) % 1;
+		console.log(integer, fraction, n);
+		return (1.0 - fraction) * list[ integer-1 ] + 
+			fraction * list[ integer ];
+	}
+}
+
+// Sample a new dataset from the original dataset, with replacement.
+function bootstrap() {
+	var randomizedPoints = [];
+	for (var i = 0; i < points.length; i++) {
+		// How do we sample with replacement?
+
+
+	}
+	
+	// Show data points moving to new locations
+	replicatedCircles.data(randomizedPoints).transition().duration(1500)
+	.attr("cx", x).attr("cy", y)
+	.style("animation-name", "resample")
+	.style("animation-duration", "4s");
+	
+	// Calculate the resulting model
+	var replicatedModel = leastSquares(randomizedPoints);
+	line(replicatedModel, "#f00", "replicated");
+	
+	// Remove the CSS animation
+	replicatedCircles.data(points)
+	.transition().delay(4000)
+	.style("animation-name", "")
+	.attr("cx", x).attr("cy", y);
+	
+	slopes.push(replicatedModel.slope);
+	slopes.sort();
+	
+	intercepts.push(replicatedModel.intercept);
+	intercepts.sort();
+
+	d3.select("#reps").text(slopes.length);
+	d3.select("#slope05")
+	.transition().delay(4000)
+	.text(formatter(percentile(slopes, 0.05)));
+	
+	d3.select("#slope95")
+	.transition().delay(4000)
+	.text(formatter(percentile(slopes, 0.95)));
+}
+
+init();
+d3.select("#clear").on("click", init);
+d3.select("#bootstrap").on("click", bootstrap);
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

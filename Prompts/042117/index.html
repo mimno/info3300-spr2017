@@ -1,0 +1,196 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Asar" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Asar', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line.axis { stroke: #ddd; }
+line.update { stroke: blue;}
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, April 21</h3>
+
+<div>
+<ul>
+	<li>We will be replicating the simplest model in this <a href="http://playground.tensorflow.org/">Neural Network toy</a>. (How does the display work?)</li>
+	<li>Tools: <a href="https://en.wikipedia.org/wiki/Perceptron">the perceptron algorithm</a>.</li>
+	<li>Inspiration: <a href="https://adventuresinmapping.com/2017/04/18/lights-on-lights-out/">Lights on/Lights out</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>How do we define a linear classifier?</li>
+		<li>How can we iteratively train a classifier without looking at all the data?</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+
+var classifier = { x: 1, y: 1 };
+
+var height = 600;
+var width = 600;
+
+
+var svg = d3.select("#plot").append("svg").attr("height", height).attr("width", width);
+var xScale = d3.scaleLinear().domain([-5, 5]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-5, 5]).range([height, 0]);
+
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(0))
+.attr("x2", xScale(0))
+.attr("y1", yScale(-100))
+.attr("y2", yScale(100));
+
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(-100))
+.attr("x2", xScale(100))
+.attr("y1", yScale(0))
+.attr("y2", yScale(0));
+
+var updateVector = svg.append("line").attr("class", "update")
+.attr("x1", xScale(0))
+.attr("x2", xScale(0))
+.attr("y1", yScale(0))
+.attr("y2", yScale(0));
+
+
+function prediction(point) {
+	return point.x * classifier.x + 
+	point.y * classifier.y;
+}
+
+var realColor = function(point) {
+	if (point.label > 0) {
+		return "#f59322";
+	}
+	else {
+		return "#0877bd";
+	}
+};
+
+var predictedColor = function(point) {
+	if (prediction(point) > 0) {
+		return "#f59322";
+	}
+	else {
+		return "#0877bd";
+	}
+};
+
+var formatter = d3.format(".3f");
+var innerProductText = function (point) {
+	return formatter( prediction(point) );
+};
+
+var points, classifierLine, classRegion;
+var trainingData = [];
+
+var pointsPerClass = 20;
+
+var normal = d3.randomNormal();
+for (var i = 0; i < pointsPerClass; i++) {
+	trainingData.push({
+		x: normal() - 1.0,
+		y: normal() + 1.0,
+		label: 1, id: i
+	});
+}
+for (var i = 0; i < pointsPerClass; i++) {
+	trainingData.push({
+		x: normal() + 1.0,
+		y: normal() - 1.0,
+		label: -1,
+		id: pointsPerClass + i
+	});
+}
+
+points = svg.selectAll("circle")
+.data(trainingData).enter().append("circle")
+.attr("id", function (point, i) { return "p"+i; })
+.attr("cx", function(point) { return xScale(point.x); })
+.attr("cy", function(point) { return yScale(point.y); })
+.attr("r", 5)
+.style("fill", realColor)
+.style("stroke", predictedColor)
+.style("stroke-width", 2)
+.on("click", update);
+ 
+classifierLine = svg.append("line")
+.attr("x1", xScale(0)).attr("y1", yScale(0))
+.attr("x2", xScale(classifier.x)).attr("y2", yScale(classifier.y))
+.style("stroke", "blue")
+.style("opacity", 0.9)
+.style("stroke-width", 3);
+
+classRegion = svg.append("line")
+.attr("x1", xScale(0))
+.attr("y1", yScale(0))
+.attr("x2", xScale(100 * classifier.x))
+.attr("y2", yScale(100 * classifier.y))
+.style("stroke", "blue")
+.style("opacity", 0.2)
+.style("stroke-width", 3000)
+.style("pointer-events", "none");
+
+var pointsSoFar = 0;
+
+// What happens when we consider a training point?
+//  Users can click individual points:
+function update(point) {
+	
+	var circle = d3.select("#p" + point.id);
+    
+	pointsSoFar ++;
+	
+	// What effect does this parameter have?
+	var learningRate = 0.3 *
+	(1.0 / pointsSoFar);
+
+	if ( true/* how do we decide whether we should do something? */ ) {
+
+		
+		// Update the current model (classifier)
+		classifier.x +=
+		learningRate * point.label * point.x;
+
+		classifier.y +=
+		learningRate * point.label * point.y;
+
+		classifierLine.transition().delay(1000).duration(1000)
+		.attr("x2", xScale(classifier.x))
+		.attr("y2", yScale(classifier.y));
+	
+		classRegion.transition().delay(1000).duration(1000)
+		.attr("x2", xScale(100 * classifier.x))
+		.attr("y2", yScale(100 * classifier.y))
+	
+		points.transition().duration(1000)
+		.style("stroke", predictedColor);
+	}
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

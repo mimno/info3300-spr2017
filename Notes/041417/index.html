@@ -1,0 +1,278 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Asar" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Asar', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+.axis { opacity: 0.1; }
+circle.real { fill: #00f; opacity: 0.1; }
+circle.replicated { fill: #f00; opacity: 0.0; }
+
+@keyframes resample {
+	from { opacity: 0.5; }
+	95% { opacity: 0.5; }
+	to { opacity: 0.0; }
+}
+
+line.regression {
+	stroke-dasharray: 1000;
+	stroke-dashoffset: 1000;
+	animation: draw 3s linear forwards;	
+}
+@keyframes draw {
+	50% { stroke-dashoffset: 1000; }
+	to { stroke-dashoffset: 0; }
+}
+</style>
+</head>
+<body>
+<h3>Notes for Friday, April 14</h3>
+
+<div>There <i>was</i> a bug in the confidence intervals! I even fixed it last year. Try some different values of the generation function to get a sense of what the permutation-test CIs should look like.</div>
+
+<div>
+<ul>
+	<li>Motivation: Is <a href="https://data.bls.gov/timeseries/CES0000000001?output_view=net_1mth">job growth changing?</a></li>
+	<li>Tools: <a href="https://en.wikipedia.org/wiki/Fisher%27s_exact_test">permutation tests</a>.</li>
+	<li>Inspiration: <a href="https://flowcharts.llnl.gov/commodities/energy">Energy flow charts</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Look at the job growth numbers. Before 2011, we see the economic apocalypse of the Great Recession. Half a million more people <i>per month</i> were losing jobs than gaining them. But after 2011, things have been extremely stable. There's no obvious pattern of ups and downs from month to month.</li>
+		<li><a href="https://en.wikipedia.org/wiki/Ronald_Fisher">Sir Ronald Fisher</a> defined a test for pattern early last century. If you apply a function to a dataset &mdash; this could be anything, but in this case the slope of a 2D linear model &mdash; you get a result. The test is to see whether that value is unlikely to be due to random chance. We simulate by actually imposing randomness.</li>
+		<li>How can we estimate the strength of a correlation? If there are two variables, x and y, then the strongest (positive) correlation would be if the lowest x value is paired with the lowest y value, and so on until the highest x value is paired with the highest y value. There's a 1 in N! chance that that will happen by random chance if there's no real connection between variables. That would be strong evidence, but we usually don't get such a clear indication.</li>
+		<li>The trick of the permutation test is to sample a number of random datasets with the same x values and the same y values, but in different combinations. Do we see values that look like our actual value, or are they very different? In this experiment we'll shuffle the data many times, and each time record what the </li>
+		<li>When do we decide that there's a pattern? Look at the range of linear regression lines we're getting from the fake, shuffled data. Does our real value look plausible within that range? If it doesn't, we have good evidence that we have an association that's unlikely to be just bad luck in our data collection. If it does, we shouldn't necessarily throw out our result, but we shouldn't bet the company on it.</li>
+	</ul>
+</div>
+
+<div id="header">
+<button id="permute">Swap y-values</button>
+<button id="clear">Clear</button>
+<div>
+<div>Replications: <span id="reps"></span></div>
+<div>Slope (real): <span id="slope"></span>; 90% Conf Int: [<span id="slope05"></span> , <span id="slope95"></span>] Size: <span id="ciSize"></span></div>
+</div>
+</div>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 400;
+var width = 400;
+var padding = 40;
+
+var svg = d3.select("#plot").append("svg")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var xExtent = [-3, 3];
+var yExtent = [-3, 3];
+
+var xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+var yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+// Helper functions to be used as callbacks
+var x = function (point) { return xScale(point.x); }
+var y = function (point) { return yScale(point.y); }
+
+var xAxis = d3.axisBottom(xScale);
+svg.append("g").call(xAxis).attr("transform", "translate(0, "+ yScale(0) + ")").attr("class", "axis");
+svg.append("text").attr("x", width * 0.4).attr("y", height + 35).text("Input Variable");
+
+var yAxis = d3.axisLeft(yScale);
+svg.append("g").call(yAxis).attr("class", "axis").attr("transform", "translate("+ xScale(0) + ",0)");
+svg.append("text").attr("transform", "rotate(270) translate(-200, -24)").text("Prediction");
+
+// Plot a line from a linear model
+var line = function(model, color, type) {
+	svg.append("line").attr("class", "regression")
+	.attr("x1", xScale(xExtent[0])).attr("y1", yScale(xExtent[0] * model.slope + model.intercept))
+	.attr("x2", xScale(xExtent[1])).attr("y2", yScale(xExtent[1] * model.slope + model.intercept))
+	.style("stroke", color)
+	.style("stroke-width", type === "replicated" ? 2 : 4)
+	.style("opacity", type === "replicated" ? 0.3 : 1.0);
+}
+
+var normalGenerator = d3.randomNormal();
+
+// Sample 2D points from a noisy linear model
+function generateFrom(intercept, slope, noise, n) {
+	var points = [];
+	
+	for (var i = 0; i < n; i++) {
+		var x = normalGenerator();
+		var y = x * slope + intercept + noise * normalGenerator(); 
+		points.push({ x: x, y: y });
+	}
+	
+	return points;
+}
+
+// Calculate the optimal slope and intercept.
+function leastSquares(points) {
+	var model = { intercept: 0, slope: 0 };
+
+	if (points.length == 0) { return model; }
+
+	var meanX = d3.mean(points, function (d) { 
+		return d.x;
+	});
+
+	var meanY = d3.mean(points, function (d) { 
+		return d.y;
+	});
+
+	model.slope = d3.sum(points, function (d) {
+		return (d.x - meanX) * (d.y - meanY);
+	});
+	model.slope /= d3.sum(points, function (d) {
+		return (d.x - meanX) * (d.x - meanX);
+	});
+
+	model.intercept = meanY - model.slope * meanX;
+	return model;
+}
+
+var realCircles, replicatedCircles, realModel;
+var slopes;
+var intercepts;
+var formatter = d3.format(".3f");
+
+var points = generateFrom(0.0, 0, 0.3, 10);
+// points.push({x: 2, y: 2});
+
+function init() {
+	// Reset everything
+	d3.selectAll("line.real").remove();
+	d3.selectAll("line.replicated").remove();
+	d3.selectAll("circle").remove();
+	slopes = [];
+	intercepts = [];
+
+	// Plot the real points
+	realCircles = svg.selectAll("circle.real")
+	.data(points).enter().append("circle")
+	.attr("class", "real")
+	.attr("cx", x).attr("cy", y)
+	.attr("r", 4);
+
+	// Plot the replicated points
+	replicatedCircles = svg.selectAll("circle.replicated")
+	.data(points).enter().append("circle")
+	.attr("class", "replicated")
+	.attr("cx", x).attr("cy", y)
+	.attr("r", 4)
+	.style("animation-name", "");
+
+	// Get the best linear fit for the real data
+	realModel = leastSquares(points);
+	line(realModel, "#00f", "real");
+	
+	d3.select("#reps").text(0);
+	d3.select("#slope").text(formatter(realModel.slope));
+	d3.select("#slope05").text("");
+	d3.select("#slope95").text("");
+	d3.select("#ciSize").text("");
+}
+
+// For example, fifth percentile (0.05) of a list of length 20 should be index 1.
+// Related: https://gist.github.com/IceCreamYou/6ffa1b18c4c8f6aeaad2
+function percentile(list, p) {
+	var n = list.length;
+	if (p <= 1.0 / (n+1)) {
+		return list[0]
+	}
+	else if (p >= n / (n+1)) { 
+		return list[n-1];
+	}
+	else {
+		// Return a weighted combination
+		var integer = Math.floor(p * (n+1)); 
+		var fraction = (p * (n+1)) % 1;
+		console.log(integer, fraction, n);
+		return (1.0 - fraction) * list[ integer-1 ] + 
+			fraction * list[ integer ];
+	}
+}
+
+// Sample a new dataset from the original dataset, breaking the relationship between x and y.
+function permutation() {
+	var randomizedPoints = [];
+	
+	var yValues = points.map(function (d) { return d.y; });
+	d3.shuffle(yValues);
+	console.log(yValues);
+	// How do we randomize the y values?
+	for (var i = 0; i < points.length; i++) {
+		randomizedPoints.push({ x: points[i].x, y: yValues[i] });
+	}
+	
+	// Show data points moving to new locations
+	replicatedCircles.data(randomizedPoints).transition().duration(1500)
+	.attr("cx", x).attr("cy", y)
+	.style("animation-name", "resample")
+	.style("animation-duration", "4s");
+	
+	// Calculate the resulting model
+	var replicatedModel = leastSquares(randomizedPoints);
+	line(replicatedModel, "#f00", "replicated");
+	
+	// Remove the CSS animation
+	replicatedCircles.data(points)
+	.transition().delay(4000)
+	.style("animation-name", "")
+	.attr("cx", x).attr("cy", y);
+	
+	// Oh no! Javascript doesn't sort numbers numerically by default.
+	//  I fixed this last year, but forgot this year.
+	slopes.push(replicatedModel.slope);
+	slopes.sort(function(a, b) { return a - b }); // <--- here
+	
+	intercepts.push(replicatedModel.intercept);
+	intercepts.sort(function(a, b) { return a - b });
+
+	var percentile05 = percentile(slopes, 0.05);
+	var percentile95 = percentile(slopes, 0.95);
+	
+	d3.select("#reps").text(slopes.length);
+	d3.select("#slope05")
+	.transition().delay(4000)
+	.text(formatter(percentile05));
+	
+	d3.select("#slope95")
+	.transition().delay(4000)
+	.text(formatter(percentile95));
+
+	d3.select("#ciSize")
+	.transition().delay(4000)
+	.text(formatter(Math.abs(percentile05 - percentile95)));
+}
+
+init();
+d3.select("#clear").on("click", init);
+d3.select("#permute").on("click", permutation);
+d3.select("svg").on("click", permutation);
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

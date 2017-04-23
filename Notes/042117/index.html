@@ -1,0 +1,251 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Asar" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Asar', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+line.axis { stroke: #ddd; }
+line.update { stroke: blue;}
+</style>
+</head>
+<body>
+<h3>Notes for Friday, April 21</h3>
+
+<div>
+<ul>
+	<li>We will be replicating the simplest model in this <a href="http://playground.tensorflow.org/">Neural Network toy</a>. (How does the display work?)</li>
+	<li>Tools: <a href="https://en.wikipedia.org/wiki/Perceptron">the perceptron algorithm</a>.</li>
+	<li>Inspiration: <a href="https://adventuresinmapping.com/2017/04/18/lights-on-lights-out/">Lights on/Lights out</a></li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>We define a linear classifier as a function that takes points in a multi-dimensional space (think different variables) and maps those points to positive or negative. We'll do this by defining a vector in the same variable space. The "prediction" (positive or negative) will be the sign of the inner product of the data vector and the classifier vector. If the two vectors are pointing in the same direction, this will be positive. If they're pointing in opposite directions the inner product will be negative. If the inner product is zero, then the data vector lies exactly on the boundary.</li>
+		<li>How do we find the best classifier vector? It should be pointing in the same direction as the positive data vectors, and away from the negative data vectors. The <i>perceptron</i> algorithm tries to build a good classifier as quickly as possible by updating the classifier vector after each new example, and ignoring the data vectors that are already being handled correctly.</li>
+		<li>But how do we update the classifier vector for the vectors we <i>do</i> want to handle? In this work we'll show visually, using animation, how this works.</li>
+	</ul>
+</div>
+
+<div id="plot"></div>
+
+<script id="notes">
+// The classifier vector. It has the same coordinates as a data point.
+var classifier = { x: 1, y: 1 };
+
+var height = 600;
+var width = 600;
+
+
+var svg = d3.select("#plot").append("svg").attr("height", height).attr("width", width);
+var xScale = d3.scaleLinear().domain([-5, 5]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-5, 5]).range([height, 0]);
+
+// Two axes. I want them visible but subtle. Style is handled in the header.
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(0))
+.attr("x2", xScale(0))
+.attr("y1", yScale(-100))
+.attr("y2", yScale(100));
+
+svg.append("line").attr("class", "axis")
+.attr("x1", xScale(-100))
+.attr("x2", xScale(100))
+.attr("y1", yScale(0))
+.attr("y2", yScale(0));
+
+function prediction(point) {
+	return point.x * classifier.x + 
+	point.y * classifier.y;
+}
+
+var realColor = function(point) {
+	if (point.label > 0) {
+		return "#0877bd";
+	}
+	else {
+		return "#f59322";
+	}
+};
+
+var predictedColor = function(point) {
+	if (prediction(point) > 0) {
+		return "#0877bd";
+	}
+	else {
+		return "#f59322";
+	}
+};
+
+var formatter = d3.format(".3f");
+var innerProductText = function (point) {
+	return formatter( prediction(point) );
+};
+
+var points, classifierLine, classRegion;
+var trainingData = [];
+
+var pointsPerClass = 20;
+
+// Generate positive and negative instances that are mostly (but not strictly)
+//  on one side of a diagonal line.
+var normal = d3.randomNormal();
+for (var i = 0; i < pointsPerClass; i++) {
+	trainingData.push({
+		x: normal() - 1.0,
+		y: normal() + 1.0,
+		label: 1, id: i
+	});
+}
+for (var i = 0; i < pointsPerClass; i++) {
+	trainingData.push({
+		x: normal() + 1.0,
+		y: normal() - 1.0,
+		label: -1,
+		id: pointsPerClass + i
+	});
+}
+
+points = svg.selectAll("circle")
+.data(trainingData).enter().append("circle")
+.attr("id", function (point, i) { return "p"+i; })
+.attr("cx", function(point) { return xScale(point.x); })
+.attr("cy", function(point) { return yScale(point.y); })
+.attr("r", 5)
+.style("fill", realColor)
+.style("stroke", predictedColor)
+.style("stroke-width", 2)
+.on("click", update);
+ 
+// Show the current classifier vector
+classifierLine = svg.append("line")
+.attr("x1", xScale(0)).attr("y1", yScale(0))
+.attr("x2", xScale(classifier.x)).attr("y2", yScale(classifier.y))
+.style("stroke", "blue")
+.style("opacity", 0.9)
+.style("stroke-width", 3);
+
+// A sneaky trick: to show the decision boundary without finding the region perpendicular to the classifier vector, I'm going to add a gigantic line that will look like a shaded region.
+classRegion = svg.append("line")
+.attr("x1", xScale(0))
+.attr("y1", yScale(0))
+.attr("x2", xScale(100 * classifier.x))
+.attr("y2", yScale(100 * classifier.y))
+.style("stroke", "blue")
+.style("opacity", 0.2)
+.style("stroke-width", 3000)
+.style("pointer-events", "none");
+
+// I want to show the update as it happens. This line will show how we construct the update and apply it.
+var updateVector = svg.append("line").attr("class", "update")
+.attr("x1", xScale(0))
+.attr("x2", xScale(0))
+.attr("y1", yScale(0))
+.attr("y2", yScale(0))
+.style("stroke", "blue")
+.style("opacity", 0.9)
+.style("stroke-width", 3);
+
+var pointsSoFar = 0;
+
+// What happens when we consider a training point?
+//  Users can click individual points, this is the callback function for a point's circle element.
+function update(point) {
+	
+	var circle = d3.select("#p" + point.id);
+	
+	pointsSoFar ++;
+	
+	// We want to move quickly at first and then slow down when we think we are closer to a good answer.
+	var learningRate = 0.3 *
+	(1.0 / pointsSoFar);
+
+	// Here's the perceptron rule:
+	//  If the prediction has the right sign, do nothing.
+	//  Otherwise, move the classifer to be closer to
+	//   the data point (if it's positive) or away from 
+	//   the data point (if it's negative)
+	if ( prediction(point) * point.label < 0.0 ) {
+		// Define a timestep for our animation.
+		var tick = 400;
+		
+		// Reset the update vector
+		updateVector
+		.attr("x1", xScale(0))
+		.attr("y1", yScale(0))
+		.attr("x2", xScale(0))
+		.attr("y2", yScale(0))
+		
+		// Show the data point as a vector
+		updateVector.transition().duration(tick)
+		.attr("x2", xScale(point.x))
+		.attr("y2", yScale(point.y));
+		
+		// Translate the vector so that we are adding it to the 
+		//  classifier vector. It will look the same, but now it
+		//  starts at the end of the classifier.
+		updateVector.transition().delay(tick).duration(tick)
+		.attr("x1", xScale(classifier.x))
+		.attr("y1", yScale(classifier.y))
+		.attr("x2", xScale(classifier.x + point.x))
+		.attr("y2", yScale(classifier.y + point.y));
+
+		// Scale the update vector down by the learning rate and reverse it if necessary
+		// because the point is negative.
+		updateVector.transition().delay(2 * tick).duration(tick)
+		.attr("x1", xScale(classifier.x))
+		.attr("y1", yScale(classifier.y))
+		.attr("x2", xScale(classifier.x + learningRate * point.label * point.x))
+		.attr("y2", yScale(classifier.y + learningRate * point.label * point.y));
+
+		// Update the current model (classifier)
+		classifier.x +=
+		learningRate * point.label * point.x;
+
+		classifier.y +=
+		learningRate * point.label * point.y;
+
+		// Make the update vector disappear as we move the classifier vector 
+		//  to its new location. Note that "classifier.x" is what used to 
+		//  be "classifier.x + learningRate * point.label * point.x", so the
+		//  x1 and x2 should now be the same.
+		updateVector.transition().delay(3 * tick).duration(2 * tick)
+		.attr("x1", xScale(classifier.x))
+		.attr("y1", yScale(classifier.y));
+
+		// Move the classifier line
+		classifierLine.transition().delay(3 * tick).duration(2 * tick)
+		.attr("x2", xScale(classifier.x))
+		.attr("y2", yScale(classifier.y));
+	
+		// Move the giant line that marks the decision boundary
+		classRegion.transition().delay(3 * tick).duration(2 * tick)
+		.attr("x2", xScale(100 * classifier.x))
+		.attr("y2", yScale(100 * classifier.y))
+	
+		// Change the circle outlines if they have crossed the decision boundary.
+		points.transition().delay(3 * tick).duration(2 * tick)
+		.style("stroke", predictedColor);
+	}
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

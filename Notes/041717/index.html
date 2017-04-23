@@ -1,0 +1,153 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Asar" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="http://d3js.org/topojson.v2.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Asar', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+canvas { border: solid #ccc 1px; }
+circle.tree { fill: rgb(117,163,40); opacity: 0.05; }
+</style>
+</head>
+<body>
+<h3>Notes for Monday, April 17</h3>
+
+<div>
+<ul>
+	<li>What do we do with lots of data? Like <a href="https://data.cityofnewyork.us/Environment/2015-Street-Tree-Census-Tree-Data/uvpi-gqnh">600k trees</a>?</li>
+	<li>Tools: <a href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API">HTML5 Canvas</a>, <a href="https://en.wikipedia.org/wiki/Kernel_density_estimation">kernel density estimators</a>.</li>
+	<li>Inspiration: <a href="https://flowcharts.llnl.gov/commodities/energy">Energy flow charts</a>, <a href="https://ourworldindata.org/life-expectancy/#it-is-not-only-about-child-mortality-life-expectancy-by-age">life expectancy</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>The SVG element uses vector graphics. We define graphics in terms of geometric shapes, which have arbitrary precision. This makes graphics crisp at any level of zoom, but means we might be storing vastly more information than the number of pixels for complicated scenes. The Canvas element uses pixel-based raster graphics.</li>
+		<li>Canvas-based graphics are a good option if we are showing lots of data, because we don't need to take up lots of memory with elements for individual shapes -- we just write to a canvas in a for loop. But SVG is still pretty fast! I was hoping there would be more of a difference with this tree example, but I'm not disappointed to find that SVG in Chrome is well optimized.</li>
+		<li>As we saw in the tensorflow example on Friday, canvas elements are also good when you want to show areas with fuzzy edges, like density maps. SVG can do this with shapes and blurring, but it is biased towards crispness. Pixel-level control can be helpful.</li>
+		<li>How can we show complicated data at large scale? First, how much data do we really need to push to the user? We can usually cut data variables we don't need. We can also filter systematically, or subsample randomly. Finally, using simple for-loops (not .forEach) and using canvas-based graphics can make things faster.</li>
+	</ul>
+</div>
+
+<p> Click each plot to load 60k trees!</p>
+<div id="plot"></div>
+
+<script id="notes">
+
+var height = 300;
+var width = 300;
+var padding = 20;
+
+var trees, selectedTrees;
+var selectedSpecies = "";
+var xExtent, yExtent, xScale, yScale, x, y;
+
+var svg = d3.select("#plot").append("svg")
+.on("click", showSVG)
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.append("g").attr("transform", "translate(" + padding + "," + padding + ")");
+
+var canvas = d3.select("#plot").append("canvas")
+.attr("height", height + 2 * padding).attr("width", width + 2 * padding)
+.on("click", showCanvas);
+var context = canvas.node().getContext("2d");
+
+// Per-line CSV processing function. Takes an object, returns an object.
+function parseLine(row) {
+	row.latitude = Number(row.latitude);
+	row.longitude = Number(row.longitude);
+	return row;
+}
+
+// Final call-back function applied when all data is available.
+function initialize(error, data) {
+	// Save outside the callback
+	trees = data;
+	selectedTrees = trees;
+	
+	console.log("loaded data");
+	
+	// We'll use the same d3 elements for both views.
+	
+	xExtent = d3.extent(trees, function (d) { return d.longitude; });
+	yExtent = d3.extent(trees, function (d) { return d.latitude; });
+
+	// This is a really naive way to show latitude and longitude,
+	//  but it gives us a cool (IMO -- in Mimno's opinion) "aerial"
+	//  view of Manhattan.
+	xScale = d3.scaleLinear().domain(xExtent).range([0, width]);
+	yScale = d3.scaleLinear().domain(yExtent).range([height, 0]);
+
+	// Helper functions to be used as callbacks
+	x = function (point) { return xScale(point.longitude); }
+	y = function (point) { return yScale(point.latitude); }
+}
+
+d3.csv("nyc_mn_trees.csv", parseLine, initialize);
+
+function select(species) {
+	selectedSpecies = species;
+	if (selectedSpecies !== "") {
+		selectedTrees = trees.filter(d => d.spc_common === selectedSpecies);
+	}
+	else {
+		selectedTrees = trees;
+	}
+	
+	showSVG();
+	showCanvas();
+}
+
+function showSVG() {	
+	console.log("displaying on SVG");
+	var circles = svg.selectAll("circle").data(selectedTrees);
+	
+	circles.exit().remove();
+	
+	circles = circles.enter().append("circle")
+	.attr("class", "tree")
+	.attr("r", 1)
+	.merge(circles);
+	
+	// Fill in here:
+	circles.attr("cx", x).attr("cy", y);
+}
+
+function showCanvas() {
+	console.log("displaying on canvas");
+	context.save();
+	context.clearRect(0, 0, height + padding, width + padding);
+	context.translate(padding, padding);
+	for (var i = 0; i < selectedTrees.length; i++) {
+		var tree = selectedTrees[i];
+		context.fillStyle = "rgba(117, 163, 40, 0.05)";
+		context.beginPath();
+		
+		// Canvas doesn't have a primitive for circles, so 
+		//  we need to use this clunky arc-based syntax.
+		// arc(x, y, radius, startAngle, endAngle, anticlockwise)
+		context.arc(x(tree), y(tree), 1, 0, Math.PI * 2, true);
+		context.fill();
+	}
+	context.restore();
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

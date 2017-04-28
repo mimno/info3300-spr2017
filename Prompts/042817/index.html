@@ -1,0 +1,426 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Alegreya+Sans" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Alegreya Sans', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text { cursor: pointer; }
+div#text { float: right; width: 40%; background-color: #dddddd; padding: 20px; border-radius: 10px; }
+</style>
+</head>
+<body>
+<h3>Prompt for Friday, April 28. Mulit-dimensional Scaling.</h3>
+
+<div>
+<ul>
+	<li>We're going to look at a specific form of 2D projection, <a href="https://en.wikipedia.org/wiki/Multidimensional_scaling">multi-dimensional scaling</a>.</li>
+	<li>Inspiration: A <a href="http://fontmap.ideo.com/">Font layout tool from IDEO</a>, and a <a href="https://medium.com/ideo-stories/organizing-the-world-of-fonts-with-ai-7d9e49ff2b25">description of how they made it</a>.</li>
+	<li>The IDEO example uses <a href="http://cs.stanford.edu/people/karpathy/tsnejs/">t-SNE</a>, which is similar. (Demo can take a while to load.)</li>
+	<li>An interview with <a href="https://pixelpioneers.co/blog/2017/speaker-spotlight-data-visualisations-with-nadieh-bremer">Nadieh Bremer</a>, author of <a href="https://nbremer.github.io/olympicfeathers/">Olympic Feathers</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>How do we show high-dimensional data in 2D?</li>
+		<li>Do we always get the same result?</li>
+		<li>Can we interpret what the algorithm is finding?</li>
+		<li>What do we gain from this view? What do we lose?</li>
+	</ul>
+</div>
+
+<div id="plot">
+	<svg></svg>
+	<div id="text"></div>
+</div>
+
+<script id="notes">
+
+// Data variables
+var vocab = [];
+var vocab_ids = {};
+var vocab_counts = {};
+var documents = [];
+var countMatrix;
+var embeddingMatrix = [];
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var extent = 2.5;
+
+var svg = d3.select("svg").attr("height", height).attr("width", width);
+var xScale = d3.scaleLinear()
+.domain([-extent, extent])
+.range([0, width]);
+var yScale = d3.scaleLinear()
+.domain([-extent, extent])
+.range([height, 0]);
+
+var texts;
+
+//
+// Linear algebra functions
+//
+
+/* Return a vector of length n, initialized with samples from a Gaussian distribution */
+var rnorm = d3.randomNormal();
+function normalVector (n) {
+    var x = new Float64Array(n);
+    for (var i = 0; i < n; i++) { x[i] = rnorm(); }
+    return x;
+}
+
+/* Return an array of the specified length, initialized to all zero */
+function zeros (n) {
+	return new Float64Array(n);
+}
+
+// Multiply a vector times a vector -> a single number
+function innerProduct(x, y) {
+	if (x.length != y.length) { console.log("vectors are not the same length"); }
+	var sum = 0.0;
+	for (var i = 0; i < x.length; i++) {
+		sum += x[i] * y[i]
+	}
+	return sum;
+}
+
+// Multiply a matrix times a vector -> a vector
+function multiply(matrix, vector) {
+	var product = new Array(vector.length);
+	
+	for (var row = 0; row < matrix.length; row++) {
+		product[row] = innerProduct(matrix[row], vector);
+	}
+	
+	return product;
+}
+
+// Scale a vector so that it has length 1.0
+function normalize(vector) {
+	var squaredSum = 0.0;
+	for (var i = 0; i < vector.length; i++) {
+		squaredSum += vector[i] * vector[i];
+	}
+	var normalizer = 1.0 / Math.sqrt(squaredSum);
+	
+	var newVector = new Float64Array(vector.length);
+	for (var i = 0; i < vector.length; i++) {
+		newVector[i] = vector[i] * normalizer;
+	}
+	return newVector;
+}
+
+// Subtract a vector from y so that x and y are perpendicular
+function orthogonalize(x, y) {
+	var scale = innerProduct(x, y) / innerProduct(x, x);
+	for (var i = 0; i < y.length; i++) {
+		y[i] -= x[i] * scale;
+	}
+}
+
+// What is the absolute difference between two matrices?
+//  Used to check for convergence. (ie have we stopped moving?)
+function diff(a, b) {
+	var sum = 0.0;
+	for (var i = 0; i < a.length; i++) {
+		for (var j = 0; j < a[i].length; j++) {
+			sum += Math.abs(a[i][j] - b[i][j]);
+		}
+	}
+	return sum;
+}
+
+/* Return the square of the Euclidean distance between two vectors.
+ This is just the Pythagorean theorem extended to multiple dimensions. */
+function squaredDistance(x, y) {
+    var sum = 0.0;
+    for (var dim = 0; dim < x.length; dim++) {
+        sum += (x[dim] - y[dim]) * (x[dim] - y[dim]);
+    }
+    return sum;
+}
+
+// The simplest Eigenvector algorithm: Normalize, multiply, orthogonalize, repeat.
+function powerIteration () {
+	var newMatrix = [ normalize(embeddingMatrix[0]), normalize(embeddingMatrix[1])];		
+	
+	newMatrix[0] = multiply(matrix, newMatrix[0]);
+	newMatrix[1] = multiply(matrix, newMatrix[1]);
+	
+	orthogonalize(newMatrix[0], newMatrix[1]);
+
+	var change = diff(embeddingMatrix, newMatrix);
+	
+	embeddingMatrix = newMatrix;	
+		
+	return change;
+}
+
+/* Calculate the distance between each pair of rows in the input data.
+    Then shift it so that the mean of every row and column is zero.
+*/
+function distanceMatrix(matrix) {
+	var numPoints = matrix.length;
+	
+	var distanceMatrix = new Array(numPoints);
+	for (var i = 0; i < numPoints; i++) {
+	    distanceMatrix[i] = new Float64Array(numPoints);
+	    for (var j = 0; j < numPoints; j++) {
+	        if (j > i) {
+	            distanceMatrix[i][j] = squaredDistance(matrix[i], matrix[j]);
+	        }
+	        else if (j == i) {
+				// The distance from a point to itself is zero
+	            distanceMatrix[i][i] = 0.0;
+	        }
+	        else {
+				// Distance is symmetric, so don't bother recalculating
+				//  pairs we already know about
+	            distanceMatrix[i][j] = distanceMatrix[j][i];
+	        }
+	    }
+	}
+
+	var colMeans = zeros(numPoints);
+	for (var row = 0; row < numPoints; row++) {
+	    for (var col = 0; col < numPoints; col++) {
+	        colMeans[col] += distanceMatrix[row][col];
+	    }
+	}
+
+	for (var col = 0; col < numPoints; col++) {
+	    colMeans[col] /= numPoints;
+	}
+
+	var rowMeans = zeros(numPoints);
+	for (var row = 0; row < numPoints; row++) {
+		var rowMean = (d3.sum(distanceMatrix[row]) - d3.sum(colMeans)) / numPoints;
+	    for (var col = 0; col < numPoints; col++) {
+			distanceMatrix[row][col] -= rowMean + colMeans[col];
+			distanceMatrix[row][col] *= -0.5;
+		}
+	}
+	
+	return distanceMatrix;
+}
+
+// Functions for converting text documents to vectors.
+// Each element in the vector corresponds to a word.
+
+function addToVocab(tokens) {
+	for (var i = 0; i < tokens.length; i++) {
+		var token = tokens[i];
+		if (vocab_ids[token]) {
+			vocab_counts[token] += 1;
+		}
+		else {
+			vocab_ids[token] = vocab.length;
+			vocab.push(token);
+			vocab_counts[token] = 1;
+		}
+	}
+}
+
+// Ways of sorting
+var byCountDesc = function (a, b) { return vocab_counts[b] - vocab_counts[a]; };
+var noFilter = function (w) { return true; };
+var lowercaseOnly = function (w) { return w.toLowerCase() === w; };
+
+function mostFrequent(numWords, filter) {
+	var keys = Object.keys(vocab_counts).sort(byCountDesc).filter(filter);
+	return keys.slice(0,numWords);
+}
+
+function toCounts(tokens) {
+	var counts = {};
+	for (var i = 0; i < tokens.length; i++) {
+		var token = tokens[i];
+		if (! counts[token]) {
+			counts[token] = 1;
+		}
+		else {
+			counts[token] += 1;
+		}
+	}
+	return counts;
+}
+
+function toCountArray(tokens, selectedVocab) {
+	var countMap = toCounts(tokens);
+	var countArray = new Float64Array(selectedVocab.length);
+	for (var i = 0; i < selectedVocab.length; i++) {
+		var word = selectedVocab[i];
+		if (countMap[word]) {
+			countArray[i] = countMap[word];
+		}
+	}
+	return l1Normalize(countArray);
+}
+
+function l1Normalize (x) {
+	var sum = 0.0;
+	for (var i = 0; i < x.length; i++) {
+		sum += Math.abs(x[i]);
+	}
+	
+	if (sum == 0.0) { return x; }
+	
+	var normalizer = 1.0 / sum;
+	for (var i = 0; i < x.length; i++) {
+		x[i] *= normalizer;
+	}
+	return x;
+}
+
+function centerColumns(rows) {
+	var nRows = rows.length;
+	var nCols = rows[0].length;
+	
+	var rowMeans = new Float64Array(nCols);
+	
+	// Collect column sums
+	for (var row = 0; row < nRows; row++) {
+		var x = rows[row];
+		for (var col = 0; col < nCols; col++) {
+			rowMeans[col] += x[col];
+		}
+	}
+	
+	// Sum -> mean
+	for (var col = 0; col < nCols; col++) {
+		rowMeans[col] /= nRows;
+	}
+	
+	// Recenter
+	for (var row = 0; row < nRows; row++) {
+		var x = rows[row];
+		for (var col = 0; col < nCols; col++) {
+			x[col] -= rowMeans[col];
+		}
+	}
+}
+
+function normalizeColumns(rows) {
+	var nRows = rows.length;
+	var nCols = rows[0].length;
+	
+	var rowNorms = new Float64Array(nCols);
+	
+	// Collect column squared sums
+	for (var row = 0; row < nRows; row++) {
+		var x = rows[row];
+		for (var col = 0; col < nCols; col++) {
+			rowNorms[col] += x[col] * x[col];
+		}
+	}
+	
+	// Sum of squares -> sample standard deviation
+	for (var col = 0; col < nCols; col++) {
+		rowNorms[col] = 1.0 / Math.sqrt(rowNorms[col] / (nRows - 1));
+	}
+	
+	// 
+	for (var row = 0; row < nRows; row++) {
+		var x = rows[row];
+		for (var col = 0; col < nCols; col++) {
+			x[col] *= rowNorms[col];
+		}
+	}
+}
+
+// This function could be used to fix systematic errors.
+function regularize(w) {
+	return w;
+}
+
+function parseLine (row) {
+	row.Tags = row.Tags.split(" ");
+	if (row.Tags.indexOf("5_star") != -1) {
+		row.Stars = 5;
+	}
+	else {
+		row.Stars = 1;
+	}
+	
+	row.tokens = row.Text.replace(/[\.,\[\]\(\)\:]/g, " ").split(" ").filter(function (w) { return w.length > 0; }).map(regularize);
+	addToVocab(row.tokens);
+	
+	documents.push(row);
+}
+
+var timer;
+
+d3.tsv("yelp.tsv", parseLine, function (error, data) {
+	if (error) { console.log(error); }
+	
+	var selectedVocab = mostFrequent(500, noFilter);
+	countMatrix = documents.map(function (d) { return toCountArray(d.tokens, selectedVocab)});
+	centerColumns(countMatrix);
+	normalizeColumns(countMatrix);
+	
+	matrix = distanceMatrix(countMatrix);
+	var numPoints = matrix.length;
+	
+	// Initialize randomly
+	embeddingMatrix = [ normalVector(numPoints), normalVector(numPoints) ];
+	
+	texts = svg.selectAll("text.point").data(documents);
+	
+	texts = texts.enter().append("text").attr("class", "point")
+	.text(function (d) { return d.Stars; })
+	.style("fill", function (d) { return d.Stars === 5 ? "#f1a340" : "#998ec3"; })
+	.on("click", function(d, i) {
+		d3.select("#text")
+		.text(d.Text + " (" + d.Tags.join(", ") + ") !!  ");
+	})
+	.merge(texts);
+	
+	iterate();
+	//timer = d3.timer(iterate);
+});
+
+function iterate() {
+	var change = powerIteration();
+	console.log(change);
+	
+	xScale = d3.scaleLinear()
+	.domain(d3.extent(embeddingMatrix[0]))
+	.range([padding, width - padding]);
+	
+	yScale = d3.scaleLinear()
+	.domain(d3.extent(embeddingMatrix[1]))
+	.range([height - padding, padding]);
+	
+	texts
+	.attr("x", function (d, i) {
+		return xScale(embeddingMatrix[0][i]);
+	})
+	.attr("y", function (d, i) {
+		return yScale(embeddingMatrix[1][i]);
+	});
+	
+	if (change < 0.1) { timer.stop(); }
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

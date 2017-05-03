@@ -1,0 +1,140 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text { cursor: pointer; }
+</style>
+</head>
+<body>
+<h3>Notes for Monday May 1. Force directed layouts.</h3>
+
+<div>
+<ul>
+	<li>We usually set the x,y positions of visual elements from data. Last week we saw a way to generate x,y positions from high-dimensional data using eigenvectors. Today we'll do something similar, but using physics simulations.</li>
+	<li>I've modified the code so that it does the simulation "silently" before laying out any of the visible elements. This mode allows you to define a force-directed layout that looks like a static layout.</li>
+	<li>If you are, say, trying to lay out a set of circles that are slightly random but not overlapping, you might want to sample desired x and y positions from Math.random(), add appropriate x and y forces, and then add a collision force with radius larger than the the radius of the circles.</li>
+	<li>See the d3 <a href="https://github.com/d3/d3-force">force layout</a> documentation.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>For this example: beeswarm layout. I'm leaving networks for 5/3.</li>
+	</ul>
+</div>
+
+<div id="plot">
+	<svg></svg>
+</div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var extent = 3;
+
+// Map data to visua properties
+var xScale = d3.scaleLinear().domain([-extent, extent]).range([0, width]);
+var yScale = d3.scaleLinear().domain([-extent, extent]).range([height, 0]);
+var rScale = d3.scaleSqrt().domain([0, 10]).range([0, 15]);
+
+// Sample randomly
+var gaussian = d3.randomNormal();
+var randIndex = function (list) { return Math.floor(list.length * Math.random()); }
+
+/* Beeswarm simulator. Circles will try to move themselves so that they are near
+    the middle vertically and lined up according to their "a" value horizontally. */
+
+var svg = d3.select("svg").attr("height", height).attr("width", width);
+
+// Create data structures containing nodes and edges between them.
+
+var nodes = [];
+
+for (var i = 0; i < 120; i++) {
+	// "a" is normal(0,1), "b" is lognormal(1, 1)
+	nodes.push({ "id": i, "a": gaussian(), "b": Math.exp(gaussian() + 1.0) });
+}
+
+// Create a d3 force simulation
+
+// Define the physics of the simulation
+var simulation = d3.forceSimulation()
+.force("positionX", d3.forceX(function (d) { return xScale(d.a); }))
+.force("positionY", d3.forceY(yScale(0)))
+.force("spacing", d3.forceCollide().radius(function (d) { return rScale(d.b); }));
+
+// Tell the simulation about the nodes, attach a self-moving event, and stop it so we can run it manually.
+simulation
+.nodes(nodes)
+.on("tick", updateDisplay)
+.stop();
+
+// Run the simulation to convergence
+while (simulation.alpha() > 0.001) {
+	simulation.tick();
+}
+
+// Create circles for nodes.
+var circles = svg.selectAll("circle").data(nodes).enter().append("circle")
+.attr("r", function (d) { return rScale(d.b); })
+.style("fill", "#2ca25f")
+.style("opacity", 0.9);
+
+// Move the circles to their locations.
+updateDisplay();
+
+function updateDisplay() {
+	circles
+	.attr("cx", function(d) { return d.x; })
+	.attr("cy", function(d) { return d.y; });
+}
+
+// Add click/drag functions
+// From https://bl.ocks.org/mbostock/2675ff61ea5e063ede2b5d63c08020c7
+circles
+.call(d3.drag()
+.on("start", dragstarted)
+.on("drag", dragged)
+.on("end", dragended));
+
+function dragstarted(d) {
+	if (!d3.event.active) { simulation.alphaTarget(0.3).restart() };
+	d.fx = d.x;
+	d.fy = d.y;
+}
+
+function dragged(d) {
+	d.fx = d3.event.x;
+	d.fy = d3.event.y;
+}
+
+function dragended(d) {
+	if (!d3.event.active) { simulation.alphaTarget(0) };
+	d.fx = null;
+	d.fy = null;
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

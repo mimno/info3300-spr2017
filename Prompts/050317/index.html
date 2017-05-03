@@ -1,0 +1,206 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<style>
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text { cursor: pointer; }
+</style>
+</head>
+<body>
+<h3>Prompt for Wednesday May 3. Network sampling.</h3>
+
+<div>
+<ul>
+	<li>How do networks emerge? Why do they have certain properties?</li>
+	<li>See the d3 <a href="https://github.com/d3/d3-force">force layout</a> documentation.</li>
+	<li>From Reuters: <a href="http://fingfx.thomsonreuters.com/gfx/rngs/NORTHKOREA-USA-PARADES/010040R41MB/index.html">North Korean military parades</a>.</li>
+</ul>
+</div>
+
+<div>
+	<ul>
+		<li>Graph styles: random, self-reinforcing, overlapping communities</li>
+		<li>How many nodes and edges can we show before we lose any coherence?</li>
+		<li>How do graph topologies affect connectivity?</li>
+	</ul>
+</div>
+
+<div id="plot">
+	<div><button id="jump">Start Random Walk</button></div>
+	<svg></svg>
+</div>
+
+<script id="notes">
+
+var height = 500;
+var width = 500;
+var padding = 50;
+
+var extent = 2.5;
+
+var gaussian = d3.randomNormal();
+var randIndex = function (list) { return Math.floor(list.length * Math.random()); }
+var randValue = function (list) { return list[Math.floor(list.length * Math.random())]; }
+
+// Sample from an un-normalized probability distribution
+var weightedRandIndex = function (weights) {
+	// We can think of "weights" as a list of regions along a line. 
+	//  To sample from the distribution, we need to pick a point along that line, 
+	//  and figure out which region we're in. Then we return the index of that region.
+	//   0     1      2      3 
+	// ------|---|--------|----
+	//              ^          
+	
+	// Calculate the sum of the weights, so we know the length of the line.
+	var sum = 0.0;
+	for (var i = 0; i < weights.length; i++) {
+		sum += weights[i];
+	}
+	
+	// Pick a random location somewhere in that line.
+	var sample = sum * Math.random();
+	
+	// Which region are we in? Look at each in turn, and peel off 
+	//  the length of each region until we 
+	var i = 0;
+	while (sample > weights[i]) {
+		sample -= weights[i];
+		i++;
+	}
+	return i;
+}
+
+var svg = d3.select("svg").attr("height", height).attr("width", width);
+var xScale = d3.scaleLinear()
+.domain([-extent, extent])
+.range([0, width]);
+var yScale = d3.scaleLinear()
+.domain([-extent, extent])
+.range([height, 0]);
+var rScale;
+
+// Create data structures containing nodes and edges between them.
+
+var nodes = [];
+var edges = [];
+
+var numCommunities = 5;
+for (var i = 0; i < 30; i++) {
+	nodes.push({ "id": i, "community": i % numCommunities, "visited": 0, "neighbors": [] });
+}
+
+for (var i = 0; i < 30; i++) {
+	var source = randIndex(nodes);
+	var weights = nodes.map(function (d) { return 1; });
+	
+	var target = weightedRandIndex(weights);
+	nodes[source].neighbors.push(target);
+	nodes[target].neighbors.push(source);
+	edges.push({ "source": source, "target": target });
+}
+
+// Create a d3 force simulation
+
+var simulation = d3.forceSimulation()
+.force("link", d3.forceLink().id(function (d) { return d.id; }))
+.force("multibody", d3.forceManyBody().strength(-5))
+.force("collide", d3.forceCollide().radius(5))
+.force("center", d3.forceCenter(xScale(0), yScale(0)));
+
+
+// Set simulation properties
+simulation.nodes(nodes).on("tick", updateDisplay);
+simulation.force("link").links(edges);
+
+// Create lines for edges and circles for nodes.
+var lines = svg.selectAll("line").data(edges).enter().append("line")
+.style("stroke", "#bdbdbd");
+var circles = svg.selectAll("circle").data(nodes).enter().append("circle")
+.attr("r", 3)
+.style("fill", "#67a9cf")
+.style("opacity", 0.9);
+
+var currentNode = 0;
+// Move to a new state
+function jump() {
+	var node = nodes[currentNode];
+	if (node.neighbors.length == 0 || Math.random() < 0.05) {
+		currentNode = randIndex(nodes);
+	}
+	else {
+		currentNode = randValue(node.neighbors);
+	}
+	node = nodes[currentNode];
+ 	node.visited++;
+
+	rScale = d3.scaleSqrt()
+	.domain([0, d3.max(nodes, function (d) { return d.visited; })])
+	.range([3, 10]);
+	
+	// Update the appearance of nodes
+	circles.transition().duration(200).style("fill", function (d,i) {
+		return i == currentNode ? "#ef8a62" : "#67a9cf";
+	})
+	.attr("r", function( d ) {
+		return rScale(d.visited);
+	});
+}
+
+d3.select("#jump").on("click", function () { })
+
+function updateDisplay() {
+	lines.attr("x1", function(d) { return d.source.x; })
+	.attr("y1", function(d) { return d.source.y; })
+	.attr("x2", function(d) { return d.target.x; })
+	.attr("y2", function(d) { return d.target.y; });
+
+	circles
+	.attr("cx", function(d) { return d.x; })
+	.attr("cy", function(d) { return d.y; });
+}
+
+// Add click/drag functions
+// From https://bl.ocks.org/mbostock/2675ff61ea5e063ede2b5d63c08020c7
+circles
+.call(d3.drag()
+.on("start", dragstarted)
+.on("drag", dragged)
+.on("end", dragended));
+
+function dragstarted(d) {
+	if (!d3.event.active) { simulation.alphaTarget(0.3).restart() };
+	d.fx = d.x;
+	d.fy = d.y;
+}
+
+function dragged(d) {
+	d.fx = d3.event.x;
+	d.fy = d3.event.y;
+}
+
+function dragended(d) {
+	if (!d3.event.active) { simulation.alphaTarget(0) };
+	d.fx = null;
+	d.fy = null;
+}
+
+</script>
+
+<!-- This block will be automatically filled with syntax-highlighted code from the script below -->
+<pre><code id="display">
+</code></pre>
+
+
+<script>
+document.getElementById("display").innerText = document.getElementById("notes").innerText;
+hljs.initHighlightingOnLoad();
+</script>
+
+
+</body>
+</html>

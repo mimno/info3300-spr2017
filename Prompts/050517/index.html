@@ -1,0 +1,164 @@
+<html>
+<head>
+<title>INFO 3300 - Data-driven Web Applications</title>
+<link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/default.min.css">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script>
+<script src="js/utility.js"></script>
+<script src="js/CT_Modeler_Expanded.js"></script>
+<style>
+body { font-family: 'Crimson Text', Calibri, sans-serif; }
+svg { border: solid #ccc 1px; }
+text { cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="canvas_3d" width="500" height="500"></canvas>
+<script>
+
+var width = window.innerWidth;
+var height = window.innerHeight;
+
+var scene, objects;
+var index = 0;
+var rotationSpeed = [ 0, 0.2, 0 ];
+
+function now() { return new Date().getTime() / 1000; }
+
+var canvas = d3.select("#canvas_3d");
+
+canvas.attr("height", height)
+.attr("width", width);
+
+scene = new CT.Scene(canvas.node());
+scene.setLight(0, [1,1,1]);
+
+objects = new CT.Node();
+scene.add(objects);
+
+var totalPoints = 1;
+var xStd = 1;
+var yStd = 1;
+var zStd = 0.5;
+
+var xScale = d3.scaleLinear().domain([-5,5]).range([-1, 1]);
+var yScale = d3.scaleLinear().domain([-5,5]).range([-1, 1]);
+var zScale = d3.scaleLinear().domain([-5,5]).range([-1, 1]);
+var rScale = d3.scaleSqrt().domain([0, 10]).range([0.02, 0.1]);
+var gaussian = d3.randomNormal();
+
+var baseRotation = [0, 0, 0];
+var rotation = [0, 0, 0];
+var translation = [0, 0, 0];
+
+objects.scale(1.0);
+
+var data = [];
+for (var i = 0; i < totalPoints; i++) {
+	data.push({ x: xStd * gaussian(), y: yStd * gaussian(),
+		z: zStd * gaussian(), r: Math.exp(gaussian() + 1) });
+}
+
+function create(data) {
+	data.forEach(function (d) {
+		var scale = 0.05;
+		var sphere = new CT.Sphere(32, 16);
+		sphere.translate(xScale(d.x), yScale(d.y), zScale(d.z));
+		//sphere.setOpacity(1.0);
+		sphere.scale(scale, scale, scale);
+		var color = color || [ 1, 1, 1 ];
+		color.push(0.5);
+		sphere.setColor(color);
+		objects.addChild(sphere);
+	});
+}
+
+function createSurface() {
+
+	var surface = new CT.Parametric(20, 20, function (u,v) {
+		return [ 2*u-1, 0.5 * Math.sin(2* Math.PI * u - v/4), 2*v - 2 ];
+	});
+	surface.setColor([1, 0, 0, 0.2]);
+	objects.addChild(surface);
+	
+}
+
+function draw() {
+	// Rotate the scene
+	objects.identity()
+	.translate(translation[0], translation[1], translation[2])
+	.rotateX(rotation[0]).rotateY(rotation[1]).rotateZ(rotation[2]);
+	objects.draw();
+}
+
+create(data);
+draw();
+
+// Interaction control
+
+// Tilt rotation
+if (window.DeviceOrientationEvent) {
+	console.log("orientation supported");
+	window.addEventListener("deviceorientation", function handleOrientation(event) {
+		var alpha = event.alpha * Math.PI / 180;
+		var beta = event.beta * Math.PI / 180;
+		var gamma = event.gamma * Math.PI / 180;
+		rotation = [ beta - baseRotation[0], gamma - baseRotation[1], alpha - baseRotation[2] ];
+		draw();
+	});
+}
+else {
+	console.log("Sorry, your browser doesn't support Device Orientation");
+}
+
+// Mouse clicks
+var mouseIsDown = false;
+d3.select("#canvas_3d").on("mousedown", function () {
+	var clickXY = d3.mouse(this);
+	mouseIsDown = true;
+	translation[0] = 2 * clickXY[0] / width - 1;
+	translation[1] = 2 * (height - clickXY[1]) / height - 1;
+	draw();
+});
+d3.select("#canvas_3d").on("mousemove", function () {
+	if (mouseIsDown) {
+		var clickXY = d3.mouse(this);
+		translation[0] = 2 * clickXY[0] / width - 1;
+		translation[1] = 2 * (height - clickXY[1]) / height - 1;
+		draw();
+	}
+});
+d3.select("#canvas_3d").on("mouseup", function () {
+	mouseIsDown = false;
+});
+
+// Keyboard interaction
+d3.select("body").on("keydown", function () {
+	if (d3.event.keyCode == 74) { translation[0] += 0.1 }
+	else if (d3.event.keyCode == 76) { translation[0] -= 0.1 }
+	else if (d3.event.keyCode == 73) { translation[1] += 0.1 }
+	else if (d3.event.keyCode == 75) { translation[1] -= 0.1 }
+	else if (d3.event.keyCode == 85) { translation[2] += 0.1 }
+	else if (d3.event.keyCode == 79) { translation[2] -= 0.1 }
+	draw();
+})
+
+// Animation
+var lastTime = now();
+function animate() {
+	var currentTime = now();
+	var deltaTime = currentTime - lastTime;
+	lastTime = currentTime;
+
+	objects.rotateX(deltaTime * rotationSpeed[0]);
+	objects.rotateY(deltaTime * rotationSpeed[1]);
+	objects.rotateZ(deltaTime * rotationSpeed[2]);
+	objects.draw();
+
+	++index;
+}
+//setInterval(animate, 200);
+
+</script>
+</body>
